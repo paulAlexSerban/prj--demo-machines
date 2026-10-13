@@ -42,3 +42,30 @@ terraform.rc
 # Optional: ignore plan files saved before destroying Terraform configuration
 # Uncomment the line below if you want to ignore planout files.
 # planout
+
+## Node.js
+node_modules/
+package-lock.json
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+*.pyzwz
+*.pyzwzw
+*.pyzwzwzw
+
+## Cursor
+.cursor/
+.cursorrules
+.cursorignore
+.cursorconfig
+.cursorhistory
+.cursorhistoryignore
+.cursorhistoryconfig
+.cursorhistoryignore
