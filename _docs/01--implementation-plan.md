@@ -1,6 +1,6 @@
 # Demo Machines — Gated Implementation Plan
 
-Derived from [`00--project-brief.md`](00--project-brief.md) §10, [`README.md`](../README.md) and [`AGENTS.md`](../AGENTS.md). Nothing is built yet.
+Derived from `[00--project-brief.md](00--project-brief.md)` §10, `[README.md](../README.md)` and `[AGENTS.md](../AGENTS.md)`. Nothing is built yet.
 
 ## How to read this plan
 
@@ -22,34 +22,42 @@ Derived from [`00--project-brief.md`](00--project-brief.md) §10, [`README.md`](
 
 ---
 
+
+
 ## Phase −1 — Prerequisites (human only, before any code)
 
 Providers are AWS and GCP. Brief §12 already records the policy, region, venue, demo-file, reaper, and sandbox decisions.
 
-| # | Human action | Output |
-|---|---|---|
-| −1.1 | Create a **sandbox AWS account** and a **sandbox GCP project**, separate from anything else you run | Accounts exist, nothing running |
-| −1.2 | Set **budget alerts** (~$20) on each | Alert visible in each console |
-| −1.3 | Create **least-privilege credentials** and store them in your password manager or env, **not** in the repo. AWS: IAM user/role scoped to the EC2/VPC actions this tool uses. GCP: a service account for Compute, plus a Billing Catalog API key later (Phase 3) | Credentials exist; agent never sees them |
-| −1.4 | Pick the cheapest region you will actually demo from (brief §12: price over latency). Use that region on both providers unless GPU stock forces a change | Region written into the example profile notes |
-| −1.5 | Install tools: Terraform (pin version), tflint, trivy *or* checkov (pick one), gitleaks, Node 22, make | `terraform version` etc. |
-| −1.6 | Request **AWS GPU quota now** (lead time is days). Check **GCP GPU availability** in the chosen region and request quota if it is not already granted. Do not raise either beyond what `gpu-24` / `gpu-48` need | Requests opened; GPU work still waits for Phase 2 |
+
+| #    | Human action                                                                                                                                                                                                                                                    | Output                                            |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| −1.1 | Create a **sandbox AWS account** and a **sandbox GCP project**, separate from anything else you run                                                                                                                                                             | Accounts exist, nothing running                   |
+| −1.2 | Set **budget alerts** (~$20) on each                                                                                                                                                                                                                            | Alert visible in each console                     |
+| −1.3 | Create **least-privilege credentials** and store them in your password manager or env, **not** in the repo. AWS: IAM user/role scoped to the EC2/VPC actions this tool uses. GCP: a service account for Compute, plus a Billing Catalog API key later (Phase 3) | Credentials exist; agent never sees them          |
+| −1.4 | Pick the cheapest region you will actually demo from (brief §12: price over latency). Use that region on both providers unless GPU stock forces a change                                                                                                        | Region written into the example profile notes     |
+| −1.5 | Install tools: Terraform (pin version), tflint, trivy *or* checkov (pick one), gitleaks, Node 24, make                                                                                                                                                          | `terraform version` etc.                          |
+| −1.6 | Request **AWS GPU quota now** (lead time is days). Check **GCP GPU availability** in the chosen region and request quota if it is not already granted. Do not raise either beyond what `gpu-24` / `gpu-48` need                                                 | Requests opened; GPU work still waits for Phase 2 |
+
 
 **Gate:** you reply "GO Phase 0".
 
 ---
+
+
 
 ## Phase 0 — By hand (baseline)
 
 **Goal:** learn what Terraform replaces; produce a measured baseline.
 
 **Agent steps**
+
 - 0.1 Write `_docs/02--phase0-runbook.md`: a fill-in checklist template (create VM in console, install Docker, clone, run, forward ports, open VS Code) with timing columns. No code.
 - 0.2 Draft a first version of `bootstrap/bootstrap.sh` *from your notes only after* you finish the run (so it encodes reality, not guesses).
 
 **Gate: DRY** — none (documentation only).
 
 **Gate: LIVE 💰** (AWS, short session — delete it the same day; the budget alert from phase −1 is already on)
+
 1. You create the VM in the console with tags `managed-by=demo-machines`, `owner`, `expires_at`, security group limited to your /32.
 2. Follow the runbook, time each step, run the demo, forward ports.
 3. **Terminate the instance. Confirm the EBS volume and any public IP are gone.** The console for that region shows nothing this tool created.
@@ -59,31 +67,46 @@ Providers are AWS and GCP. Brief §12 already records the policy, region, venue,
 
 ---
 
+
+
 ## Phase 1a — Terraform on AWS
 
 AWS is the first provider, so this phase carries the Terraform learning and takes the longest. Sub-phases are individually gated. Use the **default VPC**. If the region has none, stop and ask — don't add a network module in this phase. No instance profile until a later phase actually fetches a secret.
 
 ### 1a.0 Repo scaffolding
+
 - Agent: `Makefile` skeleton (prints underlying `terraform` command), `.terraform-version`, `profiles/demo-no-llm.example.tfvars`, `.gitignore` check for `state/`, `*.tfvars`, gitleaks config, `package.json` + strict `tsconfig` stub (so CI commands exist), CI workflow running fmt/validate/tflint/scan/gitleaks.
 - **DRY gate:** `make help`, `gitleaks detect --no-banner`, `terraform fmt -check -recursive`. Confirm no secrets/state in the tree.
 
+
+
 ### 1a.1 Variables and provider only
+
 - Agent: `terraform/aws/{versions.tf,variables.tf,outputs.tf}` with pinned versions, the README contract variables, `validation` blocks (`allowed_cidrs` must not contain `0.0.0.0/0` or `::/0`, `ttl_hours` > 0, `size` in curated set). No resources.
 - **DRY gate:** `terraform -chdir=terraform/aws init -backend=false && validate`; intentionally pass `allowed_cidrs=["0.0.0.0/0"]` with a throwaway var file and confirm validation **rejects** it.
 - Learning: variables, tfvars, validation.
 
+
+
 ### 1a.2 Security group + key pair + instance (no cloud-init yet)
+
 - Agent: Ubuntu 24.04 AMI data source; security group (22 from `allowed_cidrs` only); key pair; instance with root EBS size; tags `managed-by`, `owner`, `expires_at` (computed from `ttl_hours`; explain `timestamp()`/`timeadd()` and the drift/replacement side effect) via provider `default_tags` plus resource tags. Outputs: IP, SSH user, instance id, `expires_at`. Curated `small`/`medium` size map. Local state through `-backend-config`.
 - **DRY gate:** `fmt`, `validate`, `tflint`, trivy/checkov. Agent explains every resource in the file in a short walkthrough.
 - **Human DRY (credentials):** `make plan PROVIDER=aws PROFILE=demo-no-llm`. Read the plan line by line; you must be able to explain it (success criterion).
 - **LIVE 💰:** you run `make up`; SSH in manually; confirm tags in the console; run `make down`; confirm the instance, EBS volume and public IP are gone and `state list` is empty.
 
+
+
 ### 1a.3 cloud-init via `templatefile`
+
 - Agent: `bootstrap/cloud-init.yaml.tftpl` (calls or embeds `bootstrap.sh`; no secrets), wiring to `user_data`. Idempotent `bootstrap.sh` (Docker + Compose, clone repo using agent forwarding, optional `compose up`).
 - **DRY gate:** `validate`; render the template locally (`terraform console` or a test output) and check **no secret** appears; run `shellcheck bootstrap/bootstrap.sh` if installed.
 - **LIVE 💰:** `make up`; time to ready; run `bootstrap.sh` a **second time** over SSH to prove idempotency; `docker ps`; `make down`.
 
+
+
 ### 1a.4 Tooling: ssh-config, `open`, `status`, `allow-my-ip`
+
 - Agent: `src/ssh-config` (TypeScript, strict, unit tests for rendering with fixtures), `make open/status/allow-my-ip/down`. `allow-my-ip` fills a detected /32 only.
 - **DRY gate:** `npm run typecheck && lint && test`; render an ssh-config entry from a fixture and inspect it.
 - **LIVE 💰:** full `up → open → demo → allow-my-ip (observe in-place update in plan) → down`, three rehearsals. After each `down`, confirm the volume and public IP are gone.
@@ -92,6 +115,8 @@ AWS is the first provider, so this phase carries the Terraform learning and take
 **Sign-off:** "GO Phase 1b". (**GPU is still forbidden.**)
 
 ---
+
+
 
 ## Phase 1b — GCP
 
@@ -104,6 +129,8 @@ Same variable contract. Use the **default network** and a firewall rule. No serv
 - **Sign-off:** "GO Phase 2". (**GPU is still forbidden.**)
 
 ---
+
+
 
 ## Phase 2 — Reaper
 
@@ -122,6 +149,8 @@ Same variable contract. Use the **default network** and a firewall rule. No serv
 
 ---
 
+
+
 ## Phase 3 — Cost report
 
 - 3.1 Agent: money model (integer minor units or decimal library, currency, tax-inclusive flag), billing granularity per provider with tests (confirm AWS per-second minimum and GCP granularity from current docs; don't assume they match), usage-plan YAML parser + tests.
@@ -134,6 +163,8 @@ Same variable contract. Use the **default network** and a firewall rule. No serv
 
 ---
 
+
+
 ## Phase 4 — LLM / GPU profile (only after Phase 2 exit)
 
 - 4.1 Agent: `gpu-24` / `gpu-48` size maps for AWS and GCP (hand-curated; confirm CPU and RAM are enough for 20 containers plus an LLM). **DRY gate:** validate and a credentialed `plan` review; confirm TTL stays short and the reaper is scheduled.
@@ -145,11 +176,15 @@ Same variable contract. Use the **default network** and a firewall rule. No serv
 
 ---
 
+
+
 ## Phase 5 — Only if a real pain exists
 
 Each item needs a written justification first (brief §3 and §7.3). Candidates: Tailscale (opt-in only), pause/resume polish, remote-state migration as an exercise, Ansible. Agent stops and asks before starting any of them.
 
 ---
+
+
 
 ## Gate checklist (copy per phase)
 
@@ -163,6 +198,8 @@ Phase: ____
 [ ] Exit criteria met
 [ ] Human sign-off: GO / CHANGES: ______
 ```
+
+
 
 ## Stop-and-ask triggers (from AGENTS.md)
 
