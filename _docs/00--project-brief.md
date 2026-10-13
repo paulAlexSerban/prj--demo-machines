@@ -5,7 +5,7 @@
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Status** | Draft v0.2 — design only, nothing is built. v0.2: Terraform as learning vehicle, local state, Tailscale as fallback only, hardware-avoidance motivation |
 | **Date**   | 2026-10-13                                                                                                                                              |
-| **Owner**  | Paul Serban - paul.alex.serban@gmail.com                                                                                                                |
+| **Owner**  | Paul Serban - [paul.alex.serban@gmail.com](mailto:paul.alex.serban@gmail.com)                                                                           |
 | **Tone**   | Deliberately blunt. It is cheaper to hear this now than after three weeks of Terraform.                                                                 |
 
 
@@ -204,7 +204,8 @@ Note that several of the cheap GPU boxes have too little CPU/RAM for "20 contain
 demo-machines/
 ├── README.md
 ├── AGENTS.md
-├── docs/PROJECT_BRIEF.md
+├── _docs/00--project-brief.md
+├── _docs/01--implementation-plan.md
 ├── Makefile                      # thin wrapper: up / down / pause / resume / status / ssh-config
 ├── profiles/                     # *.example.tfvars committed; real *.tfvars gitignored
 ├── terraform/
