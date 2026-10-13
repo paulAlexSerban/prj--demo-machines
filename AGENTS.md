@@ -25,12 +25,14 @@ Tooling to create **disposable single-VM demo environments** on AWS and GCP with
 > If a command below fails because it doesn't exist yet, report that rather than creating a workaround.
 
 ```bash
+make setup                           # bash scripts/setup.sh — installs pinned tools into /usr/local/bin
+
 # Terraform (per provider root: terraform/{aws,gcp})
 terraform fmt -check -recursive
 terraform -chdir=terraform/<provider> init -backend=false
 terraform -chdir=terraform/<provider> validate
 tflint --recursive
-trivy config .                       # or checkov; keep one, don't run both
+trivy config .                       # the chosen scanner; do not also add checkov
 
 # TypeScript (pricing, reaper, ssh-config)
 npm ci

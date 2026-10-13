@@ -35,7 +35,7 @@ Providers are AWS and GCP. Brief §12 already records the policy, region, venue,
 | −1.2 | Set **budget alerts** (~$20) on each                                                                                                                                                                                                                            | Alert visible in each console                     |
 | −1.3 | Create **least-privilege credentials** and store them in your password manager or env, **not** in the repo. AWS: IAM user/role scoped to the EC2/VPC actions this tool uses. GCP: a service account for Compute, plus a Billing Catalog API key later (Phase 3) | Credentials exist; agent never sees them          |
 | −1.4 | Pick the cheapest region you will actually demo from (brief §12: price over latency). Use that region on both providers unless GPU stock forces a change                                                                                                        | Region written into the example profile notes     |
-| −1.5 | Install tools: Terraform (pin version), tflint, trivy *or* checkov (pick one), gitleaks, Node 24, make                                                                                                                                                          | `terraform version` etc.                          |
+| −1.5 | Run `make setup` (`bash scripts/setup.sh` if `make` is not installed yet). It installs pinned Terraform, tflint, trivy, and gitleaks into `/usr/local/bin`, and Node when `.nvmrc` is not already satisfied. Scanner is trivy.                                         | `terraform version` matches `.terraform-version` |
 | −1.6 | Request **AWS GPU quota now** (lead time is days). Check **GCP GPU availability** in the chosen region and request quota if it is not already granted. Do not raise either beyond what `gpu-24` / `gpu-48` need                                                 | Requests opened; GPU work still waits for Phase 2 |
 
 
@@ -75,7 +75,7 @@ AWS is the first provider, so this phase carries the Terraform learning and take
 
 ### 1a.0 Repo scaffolding
 
-- Agent: `Makefile` skeleton (prints underlying `terraform` command), `.terraform-version`, `profiles/demo-no-llm.example.tfvars`, `.gitignore` check for `state/`, `*.tfvars`, gitleaks config, `package.json` + strict `tsconfig` stub (so CI commands exist), CI workflow running fmt/validate/tflint/scan/gitleaks.
+- Agent: extend the Makefile (it already has `setup`, which prints `bash scripts/setup.sh`) with targets that print the underlying `terraform` command. Add `profiles/demo-no-llm.example.tfvars`, `.gitignore` check for `state/`, `*.tfvars`, gitleaks config, `package.json` + strict `tsconfig` stub (so CI commands exist), CI workflow running fmt/validate/tflint/scan/gitleaks.
 - **DRY gate:** `make help`, `gitleaks detect --no-banner`, `terraform fmt -check -recursive`. Confirm no secrets/state in the tree.
 
 

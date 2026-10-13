@@ -39,9 +39,9 @@ The point: **build and showcase demos without owning a powerful desktop or lapto
 
 ## Requirements
 
-- Terraform ≥ 1.x (pinned in `.terraform-version`)
-- Node.js 22+ (pricing and reaper tooling)
-- `make`, `ssh`, VS Code with the **Remote - SSH** extension
+- `make setup` — installs pinned Terraform (`.terraform-version`), tflint, trivy, gitleaks, and Node (`.nvmrc`) into `/usr/local/bin`
+- `make` and `ssh` on the system (`bash scripts/setup.sh` prints the install command if either is missing)
+- VS Code with the **Remote - SSH** extension
 - An account per provider you use — ideally a **dedicated sandbox account/project** with a **budget alert** (e.g. $20) set up first
 - Least-privilege credentials for Terraform (never your admin credentials)
 - GPU profiles: a granted quota (AWS starts at zero on new accounts; GCP varies by region). Request it days ahead
@@ -49,9 +49,20 @@ The point: **build and showcase demos without owning a powerful desktop or lapto
 
 
 
+## Setup
+
+```bash
+make setup
+```
+
+That runs `bash scripts/setup.sh`. It installs missing tools into `/usr/local/bin` (sudo when the directory is not writable) and checks each archive against the publisher's SHA256 file. A tool already on `PATH` at the pinned version is left alone. The scanner is trivy. This command does not create cloud resources.
+
 ## Quickstart (target interface)
 
 ```bash
+# 0. Install host tools
+make setup
+
 # 1. Configure a profile (real *.tfvars files are gitignored)
 cp profiles/demo-no-llm.example.tfvars profiles/demo-no-llm.tfvars
 $EDITOR profiles/demo-no-llm.tfvars        # repo URL, region, allowed_cidrs, ttl_hours, ...

@@ -203,7 +203,11 @@ demo-machines/
 ├── AGENTS.md
 ├── _docs/00--project-brief.md
 ├── _docs/01--implementation-plan.md
-├── Makefile                      # thin wrapper: up / down / pause / resume / status / ssh-config
+├── Makefile                      # setup now; up / down / pause / resume / status / ssh-config later
+├── .terraform-version            # Terraform pin read by scripts/setup.sh
+├── .nvmrc                         # Node major read by scripts/setup.sh
+├── scripts/
+│   └── setup.sh                  # make setup: install pinned host tools into /usr/local/bin
 ├── profiles/                     # *.example.tfvars committed; real *.tfvars gitignored
 ├── terraform/
 │   ├── aws/                      # one root per provider, same variable names
