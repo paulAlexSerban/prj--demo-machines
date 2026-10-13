@@ -69,3 +69,6 @@ __pycache__/
 .cursorhistoryignore
 .cursorhistoryconfig
 .cursorhistoryignore
+
+## Environment variables
+.env

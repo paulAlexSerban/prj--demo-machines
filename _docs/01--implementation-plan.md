@@ -22,21 +22,20 @@ Derived from [`00--project-brief.md`](00--project-brief.md) §10, [`README.md`](
 
 ---
 
-## Phase −1 — Prerequisites and open decisions (human only, before any code)
+## Phase −1 — Prerequisites (human only, before any code)
 
-Brief §12 lists open decisions that affect billing and security. Resolve them now.
+Providers are AWS and GCP. Brief §12 already records the policy, region, venue, demo-file, reaper, and sandbox decisions.
 
 | # | Human action | Output |
 |---|---|---|
-| −1.1 | **Policy check:** is the demo repo/data/credentials yours, and allowed on a personal account? | Written yes/no in the brief §12 |
-| −1.2 | Create **sandbox accounts/projects**: Hetzner project, AWS account (or OU/sub-account) | Accounts exist, nothing running |
-| −1.3 | Set **budget alerts** (~$20) on each | Alert visible in console |
-| −1.4 | Create **least-privilege API credentials** for Terraform (Hetzner token; AWS IAM user/role scoped to EC2/VPC tags) and store them in your password manager / env, **not** in the repo | Credentials exist; agent never sees them |
-| −1.5 | Decide: regions, reaper location (default recommendation: scheduled CI + laptop cron fallback), venue fallback plan | Decisions recorded in brief §12 |
-| −1.6 | Install tools: Terraform (pin version), tflint, trivy *or* checkov (pick one), gitleaks, Node 22, make | `terraform version` etc. |
-| −1.7 | Request **AWS GPU quota now** (lead time is days). Do not raise beyond need. | Support case opened |
+| −1.1 | Create a **sandbox AWS account** and a **sandbox GCP project**, separate from anything else you run | Accounts exist, nothing running |
+| −1.2 | Set **budget alerts** (~$20) on each | Alert visible in each console |
+| −1.3 | Create **least-privilege credentials** and store them in your password manager or env, **not** in the repo. AWS: IAM user/role scoped to the EC2/VPC actions this tool uses. GCP: a service account for Compute, plus a Billing Catalog API key later (Phase 3) | Credentials exist; agent never sees them |
+| −1.4 | Pick the cheapest region you will actually demo from (brief §12: price over latency). Use that region on both providers unless GPU stock forces a change | Region written into the example profile notes |
+| −1.5 | Install tools: Terraform (pin version), tflint, trivy *or* checkov (pick one), gitleaks, Node 22, make | `terraform version` etc. |
+| −1.6 | Request **AWS GPU quota now** (lead time is days). Check **GCP GPU availability** in the chosen region and request quota if it is not already granted. Do not raise either beyond what `gpu-24` / `gpu-48` need | Requests opened; GPU work still waits for Phase 2 |
 
-**Gate:** you reply "GO Phase 0". Agent also fixes doc inconsistency: README/AGENTS link to `docs/PROJECT_BRIEF.md`, but the file is `_docs/00--project-brief.md` — ask which name wins, then update links.
+**Gate:** you reply "GO Phase 0".
 
 ---
 
@@ -50,34 +49,34 @@ Brief §12 lists open decisions that affect billing and security. Resolve them n
 
 **Gate: DRY** — none (documentation only).
 
-**Gate: LIVE 💰** (Hetzner, ~cents)
-1. You create the VM in the console with tags/labels `managed-by=demo-machines`, `owner`, `expires_at`, firewall limited to your /32.
+**Gate: LIVE 💰** (AWS, short session — delete it the same day; the budget alert from phase −1 is already on)
+1. You create the VM in the console with tags `managed-by=demo-machines`, `owner`, `expires_at`, security group limited to your /32.
 2. Follow the runbook, time each step, run the demo, forward ports.
-3. **Delete the VM and firewall in the console. Verify the project is empty.**
+3. **Terminate the instance. Confirm the EBS volume and any public IP are gone.** The console for that region shows nothing this tool created.
 
 **Exit:** written step list + measured total time. Hand the notes to the agent.
 **Sign-off:** "GO Phase 1a" with the runbook filled in.
 
 ---
 
-## Phase 1a — Terraform on Hetzner
+## Phase 1a — Terraform on AWS
 
-Sub-phases are individually gated so you learn each Terraform concept before the next.
+AWS is the first provider, so this phase carries the Terraform learning and takes the longest. Sub-phases are individually gated. Use the **default VPC**. If the region has none, stop and ask — don't add a network module in this phase. No instance profile until a later phase actually fetches a secret.
 
 ### 1a.0 Repo scaffolding
 - Agent: `Makefile` skeleton (prints underlying `terraform` command), `.terraform-version`, `profiles/demo-no-llm.example.tfvars`, `.gitignore` check for `state/`, `*.tfvars`, gitleaks config, `package.json` + strict `tsconfig` stub (so CI commands exist), CI workflow running fmt/validate/tflint/scan/gitleaks.
 - **DRY gate:** `make help`, `gitleaks detect --no-banner`, `terraform fmt -check -recursive`. Confirm no secrets/state in the tree.
 
 ### 1a.1 Variables and provider only
-- Agent: `terraform/hetzner/{versions.tf,variables.tf,outputs.tf}` with pinned versions, the README contract variables, `validation` blocks (`allowed_cidrs` must not contain `0.0.0.0/0` or `::/0`, `ttl_hours` > 0, `size` in curated set). No resources.
-- **DRY gate:** `terraform -chdir=terraform/hetzner init -backend=false && validate`; intentionally pass `allowed_cidrs=["0.0.0.0/0"]` with a throwaway var file and confirm validation **rejects** it.
+- Agent: `terraform/aws/{versions.tf,variables.tf,outputs.tf}` with pinned versions, the README contract variables, `validation` blocks (`allowed_cidrs` must not contain `0.0.0.0/0` or `::/0`, `ttl_hours` > 0, `size` in curated set). No resources.
+- **DRY gate:** `terraform -chdir=terraform/aws init -backend=false && validate`; intentionally pass `allowed_cidrs=["0.0.0.0/0"]` with a throwaway var file and confirm validation **rejects** it.
 - Learning: variables, tfvars, validation.
 
-### 1a.2 Firewall + SSH key + server (no cloud-init yet)
-- Agent: resources for SSH key, firewall (22 from `allowed_cidrs` only), server with labels `managed-by`, `owner`, `expires_at` (computed from `ttl_hours`; explain `timestamp()`/`timeadd()` and the drift/replacement side effect), outputs: IP, SSH user, instance id, `expires_at`. Curated `small`/`medium` size map. Local state through `-backend-config`.
+### 1a.2 Security group + key pair + instance (no cloud-init yet)
+- Agent: Ubuntu 24.04 AMI data source; security group (22 from `allowed_cidrs` only); key pair; instance with root EBS size; tags `managed-by`, `owner`, `expires_at` (computed from `ttl_hours`; explain `timestamp()`/`timeadd()` and the drift/replacement side effect) via provider `default_tags` plus resource tags. Outputs: IP, SSH user, instance id, `expires_at`. Curated `small`/`medium` size map. Local state through `-backend-config`.
 - **DRY gate:** `fmt`, `validate`, `tflint`, trivy/checkov. Agent explains every resource in the file in a short walkthrough.
-- **Human DRY (credentials):** `make plan PROVIDER=hetzner PROFILE=demo-no-llm`. Read the plan line by line; you must be able to explain it (success criterion).
-- **LIVE 💰:** you run `make up`; SSH in manually; confirm labels in console; run `make down`; confirm the console shows nothing and `state list` is empty.
+- **Human DRY (credentials):** `make plan PROVIDER=aws PROFILE=demo-no-llm`. Read the plan line by line; you must be able to explain it (success criterion).
+- **LIVE 💰:** you run `make up`; SSH in manually; confirm tags in the console; run `make down`; confirm the instance, EBS volume and public IP are gone and `state list` is empty.
 
 ### 1a.3 cloud-init via `templatefile`
 - Agent: `bootstrap/cloud-init.yaml.tftpl` (calls or embeds `bootstrap.sh`; no secrets), wiring to `user_data`. Idempotent `bootstrap.sh` (Docker + Compose, clone repo using agent forwarding, optional `compose up`).
@@ -87,20 +86,21 @@ Sub-phases are individually gated so you learn each Terraform concept before the
 ### 1a.4 Tooling: ssh-config, `open`, `status`, `allow-my-ip`
 - Agent: `src/ssh-config` (TypeScript, strict, unit tests for rendering with fixtures), `make open/status/allow-my-ip/down`. `allow-my-ip` fills a detected /32 only.
 - **DRY gate:** `npm run typecheck && lint && test`; render an ssh-config entry from a fixture and inspect it.
-- **LIVE 💰:** full `up → open → demo → allow-my-ip (observe in-place update in plan) → down`, three rehearsals.
+- **LIVE 💰:** full `up → open → demo → allow-my-ip (observe in-place update in plan) → down`, three rehearsals. After each `down`, confirm the volume and public IP are gone.
 
 **Exit criteria (human checks):** 3 rehearsals ≤ 10 min each; `down` leaves nothing; you can explain every resource and every line of `plan`.
-**Sign-off:** "GO Phase 1b".
+**Sign-off:** "GO Phase 1b". (**GPU is still forbidden.**)
 
 ---
 
-## Phase 1b — AWS
+## Phase 1b — GCP
 
-- 1b.1 Agent: `terraform/aws` variables/outputs identical to Hetzner (document any difference); AMI data source (Ubuntu 24.04); **DRY gate:** validate + plan-free review.
-- 1b.2 Agent: security group (SSH from `allowed_cidrs`), key pair, instance, EBS sizing, default tags via provider `default_tags` plus resource tags, IAM instance profile (minimal; none unless needed). **DRY gate:** fmt/validate/tflint/scan. **Human DRY:** `make plan PROVIDER=aws`.
-- 1b.3 Agent: reuse the same cloud-init/bootstrap (no divergent copy).
-- **LIVE 💰:** `up → open → down` ×3. Note the public IPv4 charge and verify that EBS volume and IP are gone after `down`.
-- **Exit:** same as 1a. Record lessons (quota errors, AMI differences) in the README Troubleshooting table.
+Same variable contract. Use the **default network** and a firewall rule. No service account until a later phase fetches a secret. Reuse the AWS cloud-init and `bootstrap.sh` — no second bootstrap.
+
+- 1b.1 Agent: `terraform/gcp` variables/outputs identical to AWS (document any difference); Ubuntu 24.04 image data source. **DRY gate:** `init -backend=false`, `validate`, tflint, security scan.
+- 1b.2 Agent: firewall rule (SSH from `allowed_cidrs` only), instance, boot disk size, labels `managed-by`, `owner`, `expires_at`. **DRY gate:** same as 1b.1. **Human DRY:** `make plan PROVIDER=gcp PROFILE=demo-no-llm`.
+- **LIVE 💰:** `up → open → down` ×3. After each `down`, confirm the instance, boot disk and external IP are gone.
+- **Exit:** same as 1a. Record lessons (quota, zone stock) in the README Troubleshooting table.
 - **Sign-off:** "GO Phase 2". (**GPU is still forbidden.**)
 
 ---
@@ -108,56 +108,46 @@ Sub-phases are individually gated so you learn each Terraform concept before the
 ## Phase 2 — Reaper
 
 - 2.1 Agent: `src/reaper` expiry logic with a **fake clock**; schema-validated provider responses; fixtures recorded with a date. Tests prove untagged and non-expired resources are never selected.
-- 2.2 Agent: Hetzner + AWS adapters (list only). **DRY gate:** `npm test`; human runs `npm run reaper -- --dry-run` against a live account with a machine running (agent prints what *would* be deleted — verify the list is correct, and that unrelated resources aren't listed).
-- 2.3 Agent: delete behind explicit `--delete` flag; dry-run default; alert on anything older than N hours.
-- 2.4 Agent: scheduling (CI workflow with list/delete-only tokens in repo secrets, laptop cron fallback) — you create the tokens and secrets yourself.
-- **LIVE 💰:** 
-  1. `make up` with `ttl_hours=1`-ish (a short TTL).
+- 2.2 Agent: AWS and GCP list adapters (tags on AWS, labels on GCP). **DRY gate:** `npm test`; you run `npm run reaper -- --dry-run` against a live account with a machine running. Check the list, and check that unrelated resources are absent.
+- 2.3 Agent: delete behind an explicit `--delete` flag; dry-run default; alert on anything older than N hours.
+- 2.4 Agent: scheduling as a CI workflow (brief §12). You create the list/delete-only tokens and repo secrets yourself. Laptop cron stays a fallback.
+- **LIVE 💰:**
+  1. `make up` with a short TTL, once on AWS and once on GCP.
   2. Reaper dry-run: not listed before expiry; listed after.
-  3. Reaper `--delete` (run by you). Confirm the VM and attached resources vanish on **both** providers.
+  3. Reaper `--delete` (run by you). Confirm the VM, disk and public IP vanish on **both** providers.
   4. Let the scheduled job do it once unattended.
-  5. Orphan test: delete `state/` copy of a throwaway profile, confirm the reaper still finds the VM.
-- **Exit:** forgotten VM expires on its own on both providers. **This unlocks GPU work.**
+  5. Orphan test: remove the `state/` file for a throwaway profile, confirm the reaper still finds the VM.
+- **Exit:** a forgotten VM expires on its own on both providers. **This unlocks GPU work.**
 - **Sign-off:** "GO Phase 3".
 
 ---
 
 ## Phase 3 — Cost report
 
-- 3.1 Agent: money model (integer minor units or decimal library, currency, tax-inclusive flag), billing granularity per provider with tests (AWS per-second with minimum; Hetzner hourly capped by monthly), usage-plan YAML parser + tests.
+- 3.1 Agent: money model (integer minor units or decimal library, currency, tax-inclusive flag), billing granularity per provider with tests (confirm AWS per-second minimum and GCP granularity from current docs; don't assume they match), usage-plan YAML parser + tests.
 - 3.2 Agent: `pricing/overrides.yaml` (value, date, source URL), report generator with data age + override flags, recorded fixtures. **DRY gate:** `npm test`; generate a report from fixtures only and inspect `reports/*.md/.csv`.
-- 3.3 Agent: Hetzner fetcher (verify token requirement — mark `UNVERIFIED` otherwise), AWS Price List fetcher (regional endpoint caveat, no bulk files). **Human LIVE (no cost):** `npm run prices:fetch`; sanity-check against the provider consoles; the agent does not call live APIs in tests.
-- 3.4 `npm run cost -- --plan pricing/usage-plans/q4.yaml`; includes the "forgot 72h" line.
+- 3.3 Agent: AWS Price List fetcher (regional endpoint caveat, no bulk files). GCP Billing Catalog fetcher that **composes** vCPU + RAM + disk + IP (+ GPU when present). External-IP billing stays `UNVERIFIED` until the fetcher result is checked against the catalog. **Human LIVE (no VM cost):** you create the GCP API key, then run `npm run prices:fetch` and sanity-check both providers against their consoles. Tests never call live APIs.
+- 3.4 `npm run cost -- --plan pricing/usage-plans/q4.yaml`; includes the "forgot 72h" line. `pause_between` means a stopped instance: compute off, disk and public IP on.
 - **LIVE 💰 (reconcile):** after a real session, you compare estimate vs bill in `reports/accuracy.md`. Error > 20% twice → fix the model.
-- **Exit:** report for a real planned period; reconciled against a real bill (±15% target).
+- **Exit:** report for a real planned period; reconciled against a real bill (±15% target) on at least one session per provider.
 - **Sign-off:** "GO Phase 4".
 
 ---
 
-## Phase 4 — GCP, then Linode
+## Phase 4 — LLM / GPU profile (only after Phase 2 exit)
 
-One provider at a time; each repeats the 1a pattern: variables → resources → cloud-init → plan → live ×3 → pricing fetcher → reaper adapter.
-
-- 4.1 **GCP:** verify the GCP compute SKU composition (per-vCPU/GB-RAM + disk + IP; external IP billing is `UNVERIFIED` until checked). **DRY:** validate/tflint/scan; **human plan**; **LIVE 💰** ×3; pricing composed and tested; reaper adapter tested.
-- 4.2 **Linode:** verify cloud-init support per region/image first (`UNVERIFIED`); fall back to `bootstrap.sh` over SSH if absent. Hourly rounding up tested. Same gates.
-- **Exit:** same as 1a plus pricing and reaper per provider. **Sign-off after each provider.**
-
----
-
-## Phase 5 — LLM / GPU profile (only after Phase 2 exit)
-
-- 5.1 Agent: `gpu-24`/`gpu-48` size maps per provider (hand-curated; check CPU/RAM sufficiency for 20 containers + LLM). **Hetzner excluded.** DRY gate: validate/plan review; confirm TTL ≤ short default and reaper is scheduled.
-- 5.2 Agent: bootstrap extension (NVIDIA driver + container toolkit, Ollama/vLLM, model prefetch during prep, never on demo day; data on the persistent root volume, not instance-store NVMe).
-- 5.3 **Human checks first:** AWS GPU quota granted; budget alert in place; calendar alarm set.
-- **LIVE 💰💰 (highest cost):** one provider first, with a short TTL; cold start to model serving measured; `nvidia-smi` and a sample inference; `down`; verify with the reaper dry-run that nothing is left. Surface quota errors clearly — no retry loops.
+- 4.1 Agent: `gpu-24` / `gpu-48` size maps for AWS and GCP (hand-curated; confirm CPU and RAM are enough for 20 containers plus an LLM). **DRY gate:** validate and a credentialed `plan` review; confirm TTL stays short and the reaper is scheduled.
+- 4.2 Agent: bootstrap extension (NVIDIA driver + container toolkit, Ollama or vLLM, model prefetch during prep, never on demo day). Model weights go on the persistent root volume. On AWS GPU families, instance-store NVMe is wiped on stop.
+- 4.3 **Human checks first:** AWS GPU quota granted; GCP GPU quota and zone stock confirmed; budget alerts on; calendar alarm set for the session.
+- **LIVE 💰💰 (highest cost):** one provider first, short TTL. Measure cold start to a served model; `nvidia-smi` and a sample inference; `down`; reaper dry-run shows nothing left (instance, disk, GPU, public IP). Surface quota errors clearly — no retry loops. Repeat on the other provider only after the first is clean.
 - **Exit:** cold start to serving within an agreed, measured time.
-- **Sign-off:** "GO Phase 6" or stop.
+- **Sign-off:** "GO Phase 5" or stop.
 
 ---
 
-## Phase 6 — Only if a real pain exists
+## Phase 5 — Only if a real pain exists
 
-Each item needs a written justification first (brief §3 and §7.3). Candidates: Tailscale (opt-in only), pause/resume with explicit cost semantics per provider, remote-state migration exercise, Ansible. Agent stops and asks before starting any of them.
+Each item needs a written justification first (brief §3 and §7.3). Candidates: Tailscale (opt-in only), pause/resume polish, remote-state migration as an exercise, Ansible. Agent stops and asks before starting any of them.
 
 ---
 

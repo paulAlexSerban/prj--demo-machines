@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Instructions for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this repository. Humans: read [`README.md`](README.md) and [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md) first; this file only adds agent-specific rules.
+Instructions for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this repository. Humans: read [`README.md`](README.md) and [`_docs/00--project-brief.md`](_docs/00--project-brief.md) first; this file only adds agent-specific rules.
 
 ## What this project is
 
-Tooling to create **disposable single-VM demo environments** on AWS, GCP, Hetzner and Linode with Terraform, connect via VS Code Remote-SSH, auto-expire them, and estimate costs from provider price APIs. Status: **design phase**. It is also a **Terraform learning project** for its owner, and **Terraform state is stored locally on purpose**. If a file, command or module mentioned in the docs doesn't exist, it hasn't been built — say so; don't invent it.
+Tooling to create **disposable single-VM demo environments** on AWS and GCP with Terraform, connect via VS Code Remote-SSH, auto-expire them, and estimate costs from provider price APIs. Status: **design phase**. It is also a **Terraform learning project** for its owner, and **Terraform state is stored locally on purpose**. If a file, command or module mentioned in the docs doesn't exist, it hasn't been built — say so; don't invent it.
 
 ## Hard rules (cost and security)
 
@@ -13,7 +13,7 @@ Tooling to create **disposable single-VM demo environments** on AWS, GCP, Hetzne
 3. **Never put secrets in `user_data`, cloud-init templates, Terraform variable defaults, test fixtures or docs.** Secrets are pushed over SSH at runtime or fetched by instance identity (AWS/GCP).
 4. **Never open inbound ports to `0.0.0.0/0`.** SSH ingress comes from `allowed_cidrs` (required; tooling may fill it with the caller's detected public IP as /32, never a wide range). App ports are reached through SSH forwarding or a private network.
 5. **Every cloud resource you define must carry the standard tags/labels:** `managed-by=demo-machines`, `owner`, `expires_at`. A resource without them is a bug — the reaper can't see it.
-6. **Do not add Kubernetes, Ansible, a web UI, a 5th provider or multi-user features.** They're explicit non-goals (brief §3). If you think one is needed, stop and ask with a concrete pain that justifies it.
+6. **Do not add Kubernetes, Ansible, a web UI, a third provider or multi-user features.** They're explicit non-goals (brief §3). Providers are AWS and GCP. If you think another is needed, stop and ask with a concrete pain that justifies it.
 7. **Do not hardcode prices** anywhere except `pricing/overrides.yaml` (value + date + source URL) and test fixtures.
 8. **Don't scrape third-party price sites or marketing pages.** Use provider APIs. Aggregators were found to be stale and inconsistent.
 9. **Never read, print, diff, paste or commit Terraform state** (`state/`, `*.tfstate`, `*.tfstate.backup`). It contains secrets. Don't add a remote backend — local state is a deliberate decision.
@@ -25,7 +25,7 @@ Tooling to create **disposable single-VM demo environments** on AWS, GCP, Hetzne
 > If a command below fails because it doesn't exist yet, report that rather than creating a workaround.
 
 ```bash
-# Terraform (per provider root: terraform/{aws,gcp,hetzner,linode})
+# Terraform (per provider root: terraform/{aws,gcp})
 terraform fmt -check -recursive
 terraform -chdir=terraform/<provider> init -backend=false
 terraform -chdir=terraform/<provider> validate
@@ -69,7 +69,7 @@ reports/                  generated output, gitignored
 - Sizes are a **hand-curated map** per provider (`small`, `medium`, `large`, `gpu-24`, `gpu-48`). Don't build an automatic spec→instance matcher.
 - Variables holding secrets use `sensitive = true`, **but remember state still stores them** — prefer not to pass secrets through Terraform at all.
 - Outputs needed by tooling: public IP, SSH user, instance id, `expires_at`.
-- Keep provider-specific logic inside that provider's root. Don't write "universal" modules that need `count`/`for_each` gymnastics to cover four providers.
+- Keep provider-specific logic inside that provider's root. Don't write "universal" modules that need `count`/`for_each` gymnastics to cover both providers.
 - **This is a learning project.** Prefer simple, explicit, readable HCL over clever abstractions. Don't extract a module until the duplication is real. When you introduce a Terraform construct that's new to the codebase (data source, `templatefile`, `lifecycle`, `moved`, `import`, …), explain in the commit/PR message what it does and why — briefly.
 - **No provisioners** (`remote-exec`/`local-exec`) unless there's no alternative; if you use one, explain why.
 - The Makefile **prints the underlying `terraform` command** it runs. Don't hide Terraform behind opaque wrappers.
@@ -89,21 +89,19 @@ reports/                  generated output, gitignored
 
 - **GCP** prices compute as per-vCPU-hour + per-GB-RAM-hour by family, with separate SKUs for disks, GPUs and IPs. Instance price is *composed*; don't expect a per-instance SKU.
 - **AWS** Price List API is served from only a few regions regardless of the region priced. Never download bulk offer files.
-- **Hetzner** returns net and gross prices per location; hourly is capped by monthly.
-- **Linode** rounds hourly billing up; some plans have region-specific prices.
-- Billing granularity differs (per-second with a minimum vs hourly rounding) — model it per provider, with a test.
+- Model billing granularity per provider, with a test. Confirm AWS's per-second minimum and GCP's granularity from current docs. Don't copy one provider's rule onto the other.
 - Always include disk, public IP and snapshots when the lifecycle implies them, and exclude VAT unless the plan says otherwise.
 - Every report prints **data age** and flags **overridden** prices.
 
 ## Known traps
 
-- **Powered-off ≠ free** on Hetzner and Linode. `pause` there means snapshot + destroy. Never describe a stop on those providers as "no cost".
-- **AWS GPU quota** is zero on new accounts. Surface the quota error clearly; don't retry in a loop.
-- **A VM shutting itself down does not stop billing** on Hetzner/Linode, so self-shutdown is never an acceptable substitute for the external reaper.
+- **Stopped ≠ free.** On AWS and GCP, stopping an instance stops compute billing. The root disk and the public IP keep billing. Never describe a stop as "no cost".
+- **AWS GPU quota** is zero on new accounts. Surface the quota error clearly; don't retry in a loop. GCP GPU availability varies by region.
+- **A VM shutting itself down is not a reaper.** Compute billing can stop, but the instance, disk and IP remain until deleted.
 - **Public IPv4 is billed** on AWS (and external IPs on GCP — verify); IPs change on restart unless reserved.
 - **Instance-store NVMe is wiped on stop** (AWS GPU families). Docker data and model weights go on the EBS/persistent root volume.
 - **Terraform state contains secrets.** Never commit it, never paste it into an issue.
-- **cloud-init support differs** by provider/image/region (Linode: unverified). Test on each.
+- **Ubuntu cloud-init is the default path on both providers.** Test it on each image. If it fails, run the same `bootstrap.sh` over SSH. Don't maintain a second bootstrap.
 - **Local state is a single point of failure.** Losing it orphans billing machines; the tag-based reaper (works without state) is the backstop. Don't treat state as backed up.
 
 ## Testing expectations

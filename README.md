@@ -1,12 +1,12 @@
 # prj--demo-machines
 
-Spin up **disposable cloud VMs for demos** on AWS, GCP, Hetzner or Linode, connect with VS Code, and know roughly what it will cost before you do it.
+Spin up **disposable cloud VMs for demos** on AWS or GCP, connect with VS Code, and know roughly what it will cost before you do it.
 
 The point: **build and showcase demos without owning a powerful desktop or laptop** — rent the machine only for the hours you need. It's also a hands-on **Terraform learning project**.
 
 > ## ⚠️ Status: design only
 >
-> Nothing described below exists yet. This README is the **target interface**; it's written first so the tool gets built to a spec instead of drifting. Each section is marked with the phase that delivers it (see `[docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md)`). Don't trust a command until its phase is done.
+> Nothing described below exists yet. This README is the **target interface**; it's written first so the tool gets built to a spec instead of drifting. Each section is marked with the phase that delivers it (see [`_docs/00--project-brief.md`](_docs/00--project-brief.md)). Don't trust a command until its phase is done.
 
 
 
@@ -15,7 +15,7 @@ The point: **build and showcase demos without owning a powerful desktop or lapto
 - **Why it exists:** renting a machine for a few hours is far cheaper than buying hardware strong enough for 20 containers (and a local LLM), and you learn Terraform on a real project. Between cloud providers the price differences are cents (a 6-hour 8 vCPU / 32 GB demo is about $2); the money risk is a **GPU or forgotten machine**, which is why auto-expiry is a core feature.
 - **Remote means you need internet at the venue.** If the Wi-Fi dies, the demo dies. Keep a fallback: a screen recording of a clean run, a phone hotspot.
 - **It is a single-VM tool.** No Kubernetes. No autoscaling. 20 containers means Docker Compose on one machine.
-- **Providers are not interchangeable.** They share a *config contract*, not behaviour. Some bill powered-off servers (Hetzner, Linode). Some have no GPU (Hetzner Cloud). Some give the VM an identity (AWS, GCP) and some don't. The CLI tells you which applies every time.
+- **Providers are not interchangeable.** They share a *config contract*, not behaviour. On both, a stopped instance stops compute billing and keeps billing for the disk and the public IP. Both give the VM an identity (an instance role on AWS, a service account on GCP). The CLI prints the cost of a stop every time.
 - **Don't first-run it on demo day.** Quotas, account verification and stock-outs are real. Rehearse at least two days ahead.
 - **If the repo, data or credentials belong to an employer or client, check their policy** on running them on a personal cloud account before using this.
 
@@ -27,13 +27,12 @@ The point: **build and showcase demos without owning a powerful desktop or lapto
 | Capability                                                                     | Phase |
 | ------------------------------------------------------------------------------ | ----- |
 | Hand-build the demo environment once (the baseline Terraform must beat)        | 0     |
-| Create/destroy a VM from a *profile* on Hetzner: Docker installed, repo cloned | 1a    |
+| Create/destroy a VM from a *profile* on AWS: Docker installed, repo cloned     | 1a    |
 | Generate SSH config; `open` = port forwards + VS Code on the repo              | 1a    |
-| Same on AWS                                                                    | 1b    |
+| Same on GCP                                                                    | 1b    |
 | Tag everything with an expiry; a reaper deletes expired machines               | 2     |
 | Cost report for a planned period, per provider                                 | 3     |
-| GCP, then Linode                                                               | 4     |
-| GPU / local-LLM profile (**only after the reaper works**)                      | 5     |
+| GPU / local-LLM profile (**only after the reaper works**)                      | 4     |
 
 
 
@@ -45,7 +44,7 @@ The point: **build and showcase demos without owning a powerful desktop or lapto
 - `make`, `ssh`, VS Code with the **Remote - SSH** extension
 - An account per provider you use — ideally a **dedicated sandbox account/project** with a **budget alert** (e.g. $20) set up first
 - Least-privilege credentials for Terraform (never your admin credentials)
-- GPU profiles on AWS: a granted quota for GPU instances (request it days ahead)
+- GPU profiles: a granted quota (AWS starts at zero on new accounts; GCP varies by region). Request it days ahead
 - *(Optional)* A Tailscale account — only if "Reaching your demo" below says you need it
 
 
@@ -58,22 +57,22 @@ cp profiles/demo-no-llm.example.tfvars profiles/demo-no-llm.tfvars
 $EDITOR profiles/demo-no-llm.tfvars        # repo URL, region, allowed_cidrs, ttl_hours, ...
 
 # 2. See exactly what will be created — and what it costs per hour
-make plan PROVIDER=hetzner PROFILE=demo-no-llm
+make plan PROVIDER=aws PROFILE=demo-no-llm
 
 # 3. Create it
-make up PROVIDER=hetzner PROFILE=demo-no-llm
+make up PROVIDER=aws PROFILE=demo-no-llm
 
 # 4. Connect: writes ~/.ssh/config.d/demo-machines, starts port forwards, opens VS Code on the repo
-make open PROVIDER=hetzner
+make open PROVIDER=aws
 
 # 5. Check what's running, TTL left, cost so far
 make status
 
 # 6. Tear down
-make down PROVIDER=hetzner
+make down PROVIDER=aws
 ```
 
-**Reaching frontend ports:** VS Code Remote-SSH forwards ports automatically; or `ssh -L 3000:localhost:3000 demo-hetzner`. Nothing is opened to the internet by default.
+**Reaching frontend ports:** VS Code Remote-SSH forwards ports automatically; or `ssh -L 3000:localhost:3000 demo-aws`. Nothing is opened to the internet by default.
 
 ## Configuration
 
@@ -116,8 +115,6 @@ Don't jump to 3 or 4 because they're fun: each adds an account, a secret and a f
 | -------- | ------------------------------------- | ------------------------------------ | ----------------------------------------------------- |
 | AWS      | Compute no; disk and public IPv4 yes  | Stop instance                        | GPU quota; IP changes on restart                      |
 | GCP      | Compute no; disk and reserved IPs yes | Stop instance                        | Pricing is per-vCPU/RAM SKU, not per instance         |
-| Hetzner  | **Yes, full price**                   | Snapshot → destroy; resume recreates | Stock-outs; prices changed in 2026; no GPU in Cloud   |
-| Linode   | **Yes**                               | Snapshot → destroy; resume recreates | Hourly rounding; verify cloud-init support per region |
 
 
 Rule of thumb: **if you won't use it within the same day,** `down` **it.** Re-provisioning is cheaper than paying for an idle box or forgetting it.
@@ -154,7 +151,7 @@ npm run cost -- --plan pricing/usage-plans/q4.yaml     # writes reports/<date>-c
 - **Terraform state is secret and local** (`state/`, gitignored, mode 600, encrypted disk, encrypted backup). `sensitive = true` hides terminal output only — it does not keep values out of state.
 - **User-data is not private.** Never put tokens in it.
 - **Git access:** prefer SSH agent forwarding (nothing stored on the VM). Fallback is a read-only, short-expiry PAT pushed over SSH.
-- **Cloud access from the VM:** AWS/GCP — use an instance role / service account. Hetzner/Linode have no instance identity — push secrets over SSH at bootstrap.
+- **Cloud access from the VM:** use an instance role on AWS, or an attached service account on GCP.
 - **Private networks (only if needed):** Tailscale with ephemeral, tagged, pre-authorized keys and a tight ACL.
 - **Everything on the VM can see everything the VM can see**, including every container in your demo stack. Grant the minimum, for the minimum time, then revoke.
 
@@ -163,7 +160,7 @@ npm run cost -- --plan pricing/usage-plans/q4.yaml     # writes reports/<date>-c
 ## Cost safety
 
 - Every resource is tagged `managed-by=demo-machines`, `owner`, `expires_at`.
-- A **reaper** running outside the VM deletes expired resources across providers. (A VM that powers itself off does **not** stop billing on Hetzner/Linode.)
+- A **reaper** running outside the VM deletes expired resources on AWS and GCP. Powering the VM off stops compute billing and leaves the instance, disk and public IP in the account.
 - Set budget alerts on every account. Treat them as the second line of defence, not the first.
 - Default TTL is 12 hours. Extending it is an explicit action.
 
@@ -175,10 +172,10 @@ npm run cost -- --plan pricing/usage-plans/q4.yaml     # writes reports/<date>-c
 | Symptom                                                | Likely cause                                                                                                                  |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | `VcpuLimitExceeded` / quota error on AWS GPU           | GPU quota is zero on new accounts; request an increase days ahead                                                             |
-| Server creation fails on Hetzner                       | Plan unavailable in that location right now; try another location or plan; check account verification                         |
+| GCP quota or zone capacity error                       | CPU or GPU quota, or the zone is out of stock; try another zone in the region, or request quota                               |
 | VS Code can't connect                                  | `allowed_cidrs` doesn't include your current IP; or the IP changed after a restart                                            |
 | Repo clone fails with agent auth                       | Agent not forwarded: check `ForwardAgent yes` for the host and `ssh-add -l` locally                                           |
-| Estimate far from the bill                             | Missing disk/IP/snapshot lines, stale prices, or hourly-rounding model wrong — log it in `reports/accuracy.md`                |
+| Estimate far from the bill                             | Missing disk/IP lines, stale prices, or the billing-granularity model is wrong — log it in `reports/accuracy.md`              |
 | Terraform shows nothing but a machine is still running | State file lost, or wrong `PROVIDER`/`PROFILE` pair. Find it by tag (reaper dry-run), then delete it or `terraform import` it |
 | Demo dies mid-showcase                                 | Venue internet. Use the fallback: screen recording, phone hotspot                                                             |
 
@@ -187,8 +184,9 @@ npm run cost -- --plan pricing/usage-plans/q4.yaml     # writes reports/<date>-c
 
 ## Project docs
 
-- `[docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md)` — goals, non-goals, risks, decisions, phases
-- `[AGENTS.md](AGENTS.md)` — rules for AI coding agents working in this repo
+- [`_docs/00--project-brief.md`](_docs/00--project-brief.md) — goals, non-goals, risks, decisions, phases
+- [`_docs/01--implementation-plan.md`](_docs/01--implementation-plan.md) — gated build order
+- [`AGENTS.md`](AGENTS.md) — rules for AI coding agents working in this repo
 
 
 

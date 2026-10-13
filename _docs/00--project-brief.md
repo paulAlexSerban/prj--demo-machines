@@ -3,7 +3,7 @@
 
 |            |                                                                                                                                                         |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status** | Draft v0.2 — design only, nothing is built. v0.2: Terraform as learning vehicle, local state, Tailscale as fallback only, hardware-avoidance motivation |
+| **Status** | Draft v0.2 — design only, nothing is built. v0.2: Terraform as learning vehicle, local state, Tailscale as fallback only, hardware-avoidance motivation. Providers: AWS and GCP only |
 | **Date**   | 2026-10-13                                                                                                                                              |
 | **Owner**  | Paul Serban - [paul.alex.serban@gmail.com](mailto:paul.alex.serban@gmail.com)                                                                           |
 | **Tone**   | Deliberately blunt. It is cheaper to hear this now than after three weeks of Terraform.                                                                 |
@@ -15,7 +15,7 @@
 
 ## 1. Summary
 
-A small toolkit that creates **disposable cloud VMs for demos** on AWS, GCP, Hetzner and Linode (Akamai):
+A small toolkit that creates **disposable cloud VMs for demos** on AWS and GCP:
 
 - one command to create a VM (Docker installed, repo cloned, ports reachable),
 - one command to destroy it, plus automatic expiry as a safety net,
@@ -62,7 +62,7 @@ A small toolkit that creates **disposable cloud VMs for demos** on AWS, GCP, Het
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Kubernetes**                                        | **Don't.** 20 containers on one VM is Docker Compose. k8s adds a control plane to debug during a demo and buys nothing here. Non-goal.                                                                                                                                                   |
 | **Ansible**                                           | **Not in v1.** Cloud-init plus one idempotent bootstrap script covers "install Docker, clone repo, start stack" on a single VM. Add Ansible only if that script turns into a swamp (several host roles, real config drift).                                                              |
-| **4 providers from day one**                          | **Don't.** Terraform does not make providers interchangeable; you write four sets of resources. Only the *input contract* (variable names and meanings) is shared. Prove the contract on 2 providers first — for learning, two different providers teach you more than four repetitions. |
+| **A third provider**                                  | **Don't.** The set is AWS and GCP. Terraform does not make them interchangeable; you write two roots. Only the *input contract* (variable names and meanings) is shared. Prove that contract on AWS, then repeat it on GCP. |
 | **"Give the machine access to restricted resources"** | **This is the dangerous part, not a feature.** See §7.                                                                                                                                                                                                                                   |
 | **Generic "cpu/ram → instance type" matcher**         | Rabbit hole. Hand-curate 3–6 named sizes per provider.                                                                                                                                                                                                                                   |
 | **Tailscale**                                         | **Fallback, not default.** SSH + port forwarding covers the common case. Add Tailscale only when a concrete need shows up (§7.3).                                                                                                                                                        |
@@ -73,11 +73,11 @@ A small toolkit that creates **disposable cloud VMs for demos** on AWS, GCP, Het
 
 ### 2.3 Ranked risks
 
-1. **Forgotten machine.** A ~$3/hr GPU box left running over a long weekend is ≈ $216. Hetzner and Linode **bill powered-off servers**, so "I shut it down" is not safe on 2 of 4 providers.
+1. **Forgotten machine.** A ~$3/hr GPU box left running over a long weekend is ≈ $216. Stopping the instance stops compute billing on AWS and GCP. The disk and the public IP keep billing until they are deleted.
 2. **Credential leakage.** Tokens end up in Terraform state, user-data, shell history, or inside a container you started on the box.
 3. **Policy / legal.** If the repo, data or credentials belong to an employer or client, putting them on a personal cloud account may violate their rules. This tool makes that very easy to do by accident. Check before you use it for anything that isn't yours.
 4. **Scope creep.** This is a ~2-week project that wants to become a 3-month platform.
-5. **First run on demo day.** GPU quotas (AWS), account verification (new Hetzner/Linode accounts), stock-outs and price changes all happen at the worst moment. **Rehearse a full provision at least 2 days before every demo** and keep a fallback (laptop, or a second provider).
+5. **First run on demo day.** GPU quotas (AWS starts at zero; GCP availability varies by region), zone stock-outs and price changes all happen at the worst moment. **Rehearse a full provision at least 2 days before every demo** and keep a fallback (laptop, or the other provider).
 6. **Wrong or stale prices.** See §8.
 7. **Venue internet.** A remote demo needs a working connection. Have a fallback: a recording of a clean run, a phone hotspot, ideally a cut-down local version.
 8. **Local state loss.** Lose the state file and Terraform forgets machines that are still billing. See §6.4; the tag-based reaper is the backstop.
@@ -115,7 +115,7 @@ A small toolkit that creates **disposable cloud VMs for demos** on AWS, GCP, Het
 
 ### Non-goals
 
-Kubernetes · Ansible (v1) · multi-user/team features · remote state backends (state is deliberately local) · web UI · production workloads · HA / autoscaling · Windows VMs · a 5th provider · automated cost *optimization* (the tool reports, you decide) · managing the demo application itself.
+Kubernetes · Ansible (v1) · multi-user/team features · remote state backends (state is deliberately local) · web UI · production workloads · HA / autoscaling · Windows VMs · a third provider · automated cost *optimization* (the tool reports, you decide) · managing the demo application itself.
 
 ---
 
@@ -127,7 +127,7 @@ Kubernetes · Ansible (v1) · multi-user/team features · remote state backends 
 | Profile       | Spec                                                                                                                                        | Notes                                                                                                                                                                                                                            |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `demo-no-llm` | 8 vCPU / 32 GB RAM / **100 GB** SSD, Ubuntu 24.04, Docker + Compose                                                                         | 64 GB is tight for ~20 images plus build cache — budget 100 GB; it costs pennies. Frontend ports via SSH forwarding.                                                                                                             |
-| `demo-llm`    | GPU with 24 GB VRAM (7–14B models) or 48 GB (≈30B quantized), ≥ 64 GB RAM, ≥ 200 GB disk, NVIDIA driver + container toolkit, Ollama or vLLM | Models are pre-pulled during prep, **never on demo day**. Providers: AWS, GCP, Linode GPU plans (verify per-region availability). **Hetzner Cloud has no GPU servers** (GPU is on dedicated, monthly-billed servers) → excluded. |
+| `demo-llm`    | GPU with 24 GB VRAM (7–14B models) or 48 GB (≈30B quantized), ≥ 64 GB RAM, ≥ 200 GB disk, NVIDIA driver + container toolkit, Ollama or vLLM | Models are pre-pulled during prep, **never on demo day**. Providers: AWS and GCP. Verify GPU availability per region before relying on a size. |
 
 
 
@@ -144,15 +144,12 @@ A **profile** describes a machine (provider, size, disk, TTL). A **demo** is wha
 | Box                                               | Approx. price                                                                              |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | GCP `e2-standard-8` (8 vCPU / 32 GB)              | ~$0.27–0.30 / hr depending on region                                                       |
-| Linode shared 32 GB (8 vCPU)                      | ~$0.29 / hr (dedicated 16 vCPU / 32 GB ≈ $0.43 / hr)                                       |
-| Hetzner CPX62 (16 shared vCPU / 32 GB)            | ~€39 / month ≈ €0.06 / hr (derived, not quoted)                                            |
 | GCP `g2-standard-8` (8 vCPU / 32 GB / L4 24 GB)   | ~$0.85 / hr (us-central1)                                                                  |
 | AWS `g6.4xlarge` (16 vCPU / 64 GB / L4 24 GB)     | ~$1.32 / hr (us-east-1)                                                                    |
 | AWS `g6e.4xlarge` (16 vCPU / 128 GB / L40S 48 GB) | ~$3.00 / hr (us-east-1)                                                                    |
-| Linode GPU plans                                  | ~$0.52 / hr (RTX 4000 Ada, only 4 vCPU / 16 GB) and ~$1.50 / hr (RTX 6000, 8 vCPU / 32 GB) |
 
 
-Note that several of the cheap GPU boxes have too little CPU/RAM for "20 containers + LLM" at the same time. Check that before getting excited about the hourly price.
+Confirm the curated `gpu-24` / `gpu-48` map against current regional availability before use. AWS non-GPU prices are still not in this table.
 
 ---
 
@@ -209,7 +206,8 @@ demo-machines/
 ├── Makefile                      # thin wrapper: up / down / pause / resume / status / ssh-config
 ├── profiles/                     # *.example.tfvars committed; real *.tfvars gitignored
 ├── terraform/
-│   ├── aws/      gcp/      hetzner/      linode/      # one ROOT per provider, same variable names
+│   ├── aws/                      # one root per provider, same variable names
+│   ├── gcp/
 │   └── modules/                  # only what is genuinely shared (e.g. cloud-init rendering)
 ├── bootstrap/
 │   ├── cloud-init.yaml.tftpl
@@ -230,13 +228,14 @@ demo-machines/
 | Decision          | Choice                                                                         | Status      | Why                                                                                                                                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IaC               | Terraform only (no OpenTofu)                                                   | Decided     | It's also the learning vehicle: the point is hands-on Terraform experience.                                                                                                                         |
-| Root modules      | **One root per provider**, identical variable names                            | Recommended | A single root with 4 provider blocks needs credentials for all four on every run.                                                                                                                   |
+| Root modules      | **One root per provider**, identical variable names                            | Decided     | A single root with both provider blocks needs credentials for both on every run.                                                                                                                    |
 | Sizing            | Hand-curated named sizes per provider (`small`, `medium`, `gpu-24`, `gpu-48`)  | Recommended | Auto-matching specs to instance types is a time sink.                                                                                                                                               |
-| First-boot config | cloud-init user-data, falling back to running `bootstrap.sh` over SSH          | Recommended | cloud-init support differs per provider (Linode: verify). One shared `bootstrap.sh` keeps behaviour identical.                                                                                      |
+| First-boot config | cloud-init user-data, falling back to running `bootstrap.sh` over SSH          | Recommended | Ubuntu cloud-init on AWS and GCP. One shared `bootstrap.sh`. If cloud-init fails on an image, run that same script over SSH.                                                                        |
 | State             | **Local**, one file per provider+profile under `state/` (gitignored, mode 600) | Decided     | Single user, simplest to learn from. Trade-offs in §6.4.                                                                                                                                            |
-| Tooling language  | TypeScript (Node 22) for pricing + reaper                                      | Recommended | Author's primary stack; all four providers are plain REST/SDK. Python is equally valid — pick one, don't support both.                                                                              |
+| Tooling language  | TypeScript (Node 22) for pricing + reaper                                      | Recommended | Author's primary stack; both providers are plain REST/SDK. Python is equally valid — pick one, don't support both.                                                                                  |
 | Ansible / k8s     | Out of scope                                                                   | Decided     | See §2.2.                                                                                                                                                                                           |
-| Provider order    | Hetzner → AWS → GCP → Linode                                                   | Recommended | Hetzner has the smallest resource set (best Terraform learning loop); AWS adds IAM/VPC/AMI/quota realism and GPU; GCP and Linode follow. If Hetzner account verification stalls, start with Linode. |
+| Providers         | **AWS and GCP only**                                                           | Decided     | Hetzner and Linode are out. A third provider is a non-goal.                                                                                                                                         |
+| Provider order    | AWS → GCP                                                                      | Decided     | AWS first: GPU quota has lead time, and the variable contract is designed against security groups, AMI lookup and IAM. GCP repeats that contract. Composed GCP pricing belongs in the cost phase.   |
 
 
 
@@ -248,11 +247,9 @@ demo-machines/
 | -------- | ---------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | AWS      | Compute: no. EBS volume (and any public/Elastic IPv4): yes | Stop instance                                        | Public IPv4 is billed hourly; IP changes on restart unless you pay for an Elastic IP. |
 | GCP      | Compute: no. Persistent disk (and reserved IPs): yes       | Stop instance                                        | Verify external-IP charges.                                                           |
-| Hetzner  | **Yes — full price until deleted**                         | Snapshot → destroy; `resume` recreates from snapshot | Snapshot billed per GB-month; slower resume; IP changes.                              |
-| Linode   | **Yes — billed while powered off**                         | Snapshot/image → destroy; `resume` recreates         | Hourly billing rounds up to the hour.                                                 |
 
 
-`pause` therefore means different things; the CLI must print the cost implication every time.
+`pause` stops the instance on both. Compute billing stops; the disk and the public IP do not. The CLI must print that every time.
 
 ### 6.4 Local state — a deliberate trade-off
 
@@ -261,7 +258,7 @@ Local state is fine for one user and is the best way to learn: you can open the 
 - **No backup.** Disk dies or the folder is deleted → Terraform forgets machines that still exist and bill. Mitigations: the tag-based reaper works without state; copy `state/` to an encrypted location after each `up`/`down`.
 - **State contains secrets** (anything sensitive that passed through Terraform, generated keys). `state/` is gitignored, mode 600, on an encrypted disk; never paste it into chats or issues.
 - **One state file per provider+profile** (`state/<provider>-<profile>.tfstate`), passed via backend config by the Makefile, so profiles never overwrite each other. Workspaces are the alternative; separate files are easier to reason about while learning.
-- **It lives on one computer.** Using a second laptop means copying the file. Migrating to a remote backend later is a good learning exercise (Phase 6, optional) — not v1.
+- **It lives on one computer.** Using a second laptop means copying the file. Migrating to a remote backend later is a good learning exercise (Phase 5, optional) — not v1.
 - Solo use makes locking a non-issue; just don't run two `terraform` commands against the same state at once.
 
 ---
@@ -279,7 +276,7 @@ This is where the project can hurt you. Treat it as a security design, not a con
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Private git repo            | **SSH agent forwarding** from your laptop (no secret lands on the VM). Fallback: fine-grained, read-only PAT, expiry ≤ 7 days, injected over SSH at bootstrap.                                                                | Deploy keys (needs repo admin — you said you don't have it), PAT in user-data or tfvars. |
 | Private container registry  | Short-lived token piped to `docker login --password-stdin` over SSH at runtime.                                                                                                                                               | Tokens in compose files or image layers.                                                 |
-| App secrets / config        | **AWS:** instance role + SSM Parameter Store / Secrets Manager. **GCP:** attached service account + Secret Manager. **Hetzner/Linode:** no instance identity — push secrets over SSH from your password manager at bootstrap. | `.env` committed anywhere; secrets as Terraform variables.                               |
+| App secrets / config        | **AWS:** instance role + SSM Parameter Store / Secrets Manager. **GCP:** attached service account + Secret Manager.                                                                                                      | `.env` committed anywhere; secrets as Terraform variables.                               |
 | Internal / private services | If simpler options (§7.3) don't fit, Tailscale with an **ephemeral, tagged, pre-authorized** key and an ACL that limits the node to specific hosts/ports.                                                                     | Opening corporate services to the internet; long-lived VPN credentials on the VM.        |
 | Terraform state             | Treat as a secret: local `state/` dir, gitignored, mode 600, disk encryption on, encrypted off-machine backup.                                                                                                                | Committing state; pasting it into chats or issues.                                       |
 
@@ -291,7 +288,7 @@ This is where the project can hurt you. Treat it as a security design, not a con
 - `sensitive = true` hides values in terminal output. **It does not keep them out of the state file.**
 - User-data is readable from the instance metadata service and, on most providers, from the console/API.
 - Anything running on the VM — including every container in the demo stack — can read what the VM can read. Give it the minimum, for the minimum time, and revoke afterwards.
-- AWS/GCP give you instance identity so you can avoid static secrets. Hetzner/Linode don't. Plan on that asymmetry.
+- Both providers give the VM an identity (AWS instance role, GCP service account), so app secrets are fetched at runtime and stay out of user-data.
 - **Policy check:** if the repo, data or credentials are an employer's or client's, confirm that running them on a personal cloud account is allowed *before* the first `make up`.
 
 
@@ -324,8 +321,6 @@ This is where the project can hurt you. Treat it as a security design, not a con
 | -------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AWS      | Price List API (`pricing:GetProducts`, filtered by instance type/region/OS); `ec2:DescribeSpotPriceHistory` for spot | Needs credentials; the pricing API is served from only a few regions regardless of which region you price; bulk offer files are huge — don't use them.                                             |
 | GCP      | Cloud Billing Catalog API (Compute Engine service)                                                                   | Prices are per vCPU-hour and per GB-RAM-hour by machine family, plus separate SKUs for disks, GPUs, IPs — **instance price must be composed**. Needs an API key. Budget a full day for this alone. |
-| Hetzner  | Cloud API server-types endpoint (per-location prices, net and gross)                                                 | Needs an API token (verify). Prices changed twice in 2026; stock varies.                                                                                                                           |
-| Linode   | Public types endpoint (hourly/monthly, region-specific prices)                                                       | Verify it is unauthenticated and that region prices are included.                                                                                                                                  |
 
 
 **Rules:**
@@ -340,7 +335,7 @@ This is where the project can hurt you. Treat it as a security design, not a con
 
 - **Target accuracy:** ±15% for compute + disk + IP over the stated hours.
 - **Not promised:** egress, taxes/VAT, FX, free-tier or credits, support plans.
-- Billing granularity differs (per-second with minimum vs rounded up to the hour; Hetzner hourly capped by monthly) — model it per provider.
+- Model billing granularity per provider, with a test. Confirm AWS's per-second minimum and GCP's granularity from current docs when the fetchers are written.
 - **Reconcile after real use:** compare estimate vs actual bill and log it in `reports/accuracy.md`. If error exceeds 20% twice, fix the model rather than trusting it.
 
 
@@ -355,13 +350,13 @@ scenarios:
     sessions: 3
     hours_per_session: 6          # prep + demo
     lifecycle: destroy_after      # destroy_after | pause_between
-    providers: [aws, gcp, hetzner, linode]
+    providers: [aws, gcp]
   - name: llm-demo
     profile: demo-llm
     sessions: 1
     hours_per_session: 8
     lifecycle: destroy_after
-    providers: [aws, gcp, linode]
+    providers: [aws, gcp]
 include: { disk: true, public_ip: true, snapshots: true, vat: false }
 risk_scenarios: [forgot_72h]      # what a forgotten machine would cost
 ```
@@ -378,8 +373,8 @@ risk_scenarios: [forgot_72h]      # what a forgotten machine would cost
 
 ## 9. Cost safety (non-negotiable)
 
-- Every resource carries `managed-by=demo-machines`, `owner`, `expires_at` (UTC ISO). All four providers support tags/labels.
-- **Reaper:** a scheduled job *outside* the VM lists tagged resources across providers and destroys expired ones, and alerts on anything older than N hours. A VM shutting *itself* down is **not enough**: it stops compute billing on AWS/GCP but not on Hetzner/Linode.
+- Every resource carries `managed-by=demo-machines`, `owner`, `expires_at` (UTC ISO). AWS tags and GCP labels both carry these three keys.
+- **Reaper:** a scheduled job *outside* the VM lists tagged resources across providers and destroys expired ones, and alerts on anything older than N hours. A VM shutting *itself* down is **not enough**: compute billing stops, but the instance, disk and public IP stay until something deletes them.
 - Where does the reaper run? Laptop cron only works while the laptop is on. Recommended: a scheduled CI workflow (e.g. GitHub Actions) with list/delete-only tokens in repo secrets; laptop cron as a fallback. **Open decision.**
 - Default TTL 12 h; extending it is an explicit action.
 - **No GPU machines until the reaper works.** Until then: budget alert plus a calendar alarm for every running machine.
@@ -399,14 +394,13 @@ Gut estimates for part-time work, **assuming you're learning Terraform as you go
 
 | Phase                         | Scope                                                                                                                                                                                    | Est.                                         | Exit criteria                                                                                          |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **0 — By hand**               | Create the VM manually (console/CLI) on Hetzner, install Docker, clone the repo, run the demo, forward ports, open VS Code. Time it; write down every step.                              | ½–1 day                                      | Written step list; measured baseline for Terraform to beat.                                            |
-| **1a — Terraform on Hetzner** | Smallest resource set: server, SSH key, firewall, labels. Variables/tfvars, outputs, `templatefile` cloud-init, local state per profile, `up/down/status/open`.                          | 2–3 days                                     | 3 rehearsals ≤ 10 min; `down` leaves nothing; you can explain every resource and every line of `plan`. |
-| **1b — AWS**                  | Same variable contract on AWS: AMI lookup (data source), security group, key pair, instance profile, EBS sizing, tags. First contact with quotas (request GPU quota now, it takes time). | 3–4 days                                     | Same criteria as 1a.                                                                                   |
-| **2 — Reaper**                | Tag-based reaper for Hetzner + AWS, dry-run default, scheduled outside the VM.                                                                                                           | 1–2 days                                     | A forgotten VM expires on its own on both providers. **Gate: no GPU machines before this.**            |
-| **3 — Cost report**           | Fetchers (Hetzner, AWS), usage plan, report, accuracy log.                                                                                                                               | 2–3 days                                     | Report for a real planned period; reconciled against a real bill.                                      |
-| **4 — GCP, then Linode**      | Root + pricing + rehearsal per provider.                                                                                                                                                 | 1–2 days each (GCP pricing is the slow part) | Same exit criteria as 1a.                                                                              |
-| **5 — LLM profile**           | GPU sizes, driver/toolkit bootstrap, model prefetch, quota notes.                                                                                                                        | 2–3 days                                     | Cold start to serving a model within an agreed, measured time.                                         |
-| **6 — Only if needed**        | Tailscale, pause/resume polish, remote-state migration as an exercise, Ansible only with a concrete justification.                                                                       | —                                            | A real pain from earlier phases.                                                                       |
+| **0 — By hand**           | Create the VM manually (console/CLI) on AWS, install Docker, clone the repo, run the demo, forward ports, open VS Code. Time it; write down every step.                                                          | ½–1 day   | Written step list; measured baseline for Terraform to beat.                                                                     |
+| **1a — Terraform on AWS** | Variable contract, AMI data source, security group, key pair, instance, EBS sizing, tags, `templatefile` cloud-init, local state per profile, `up/down/status/open`. Default VPC. Request GPU quota now. | 4–5 days  | 3 rehearsals ≤ 10 min; `down` leaves nothing (instance, volume, public IP); you can explain every resource and every line of `plan`. |
+| **1b — GCP**              | Same variable contract: image lookup, firewall rule, instance, boot disk, labels. Reuse the AWS cloud-init.                                                                                                         | 2–3 days  | Same criteria as 1a.                                                                                                                 |
+| **2 — Reaper**            | Tag/label reaper for AWS + GCP, dry-run default, scheduled outside the VM.                                                                                                                                        | 1–2 days  | A forgotten VM expires on its own on both providers. **Gate: no GPU machines before this.**                                          |
+| **3 — Cost report**       | Fetchers (AWS Price List, GCP Billing Catalog), usage plan, report, accuracy log. GCP pricing is the slow part.                                                                                                   | 3–4 days  | Report for a real planned period; reconciled against a real bill.                                                                    |
+| **4 — LLM profile**       | GPU sizes on AWS and GCP, driver/toolkit bootstrap, model prefetch, quota notes.                                                                                                                                  | 2–3 days  | Cold start to serving a model within an agreed, measured time.                                                                       |
+| **5 — Only if needed**    | Tailscale, pause/resume polish, remote-state migration as an exercise, Ansible only with a concrete justification.                                                                                                | —         | A real pain from earlier phases.                                                                                                      |
 
 
 
@@ -418,15 +412,15 @@ Gut estimates for part-time work, **assuming you're learning Terraform as you go
 | ------------------------------------ | ----------------------------------------------------------------------- |
 | Variables, tfvars, validation blocks | Profiles                                                                |
 | Outputs                              | `status`, ssh-config (IP, user, `expires_at`)                           |
-| Data sources                         | AWS AMI lookup; Hetzner locations/server types                          |
+| Data sources                         | AWS AMI lookup; GCP image and machine-type lookup                       |
 | `templatefile`                       | cloud-init                                                              |
-| Dependencies, `depends_on`           | Firewall ↔ server attachment                                            |
+| Dependencies, `depends_on`           | Security group / firewall rule ↔ instance                               |
 | In-place update vs replacement       | `make allow-my-ip` (update); `terraform apply -replace=…` (rebuild)     |
 | `terraform import`                   | Adopt the hand-built Phase 0 VM (optional exercise)                     |
 | State commands                       | `state list/show` — look inside, and notice what secrets it holds       |
 | `moved` blocks, refactoring          | When (if) a shared module is extracted                                  |
 | Provisioners                         | Read about them, then understand why they're discouraged and avoid them |
-| Remote backends                      | Optional Phase 6 migration                                              |
+| Remote backends                      | Optional Phase 5 migration                                              |
 
 
 ---
@@ -449,26 +443,21 @@ Gut estimates for part-time work, **assuming you're learning Terraform as you go
 
 ## 12. Decisions
 
-**Decided (v0.2):** Terraform only · local state · Tailscale only as a fallback (§7.3).
-
-**Still open:**
-
-1. **Where the reaper runs** — recommendation: a scheduled CI workflow with list/delete-only tokens; laptop cron as a fallback.
-2. **Personal vs separate sandbox accounts/projects** — recommendation: separate, with budget alerts, before the first `up`.
-3. **Whose repo, data and credentials are these** — and is running them on a personal account permitted?
-4. **Regions** — latency to the venue/audience vs price.
-5. **Venue fallback plan** — what you do if the internet fails mid-demo (recording, hotspot, local lite version).
-6. **How demos are defined** — profile + demo in one tfvars file (v1) vs a separate manifest once there are more than ~3 demos.
-
+- **Decided (v0.2):** Terraform only · local state · Tailscale only as a fallback (§7.3).
+- **Decided:** Providers are **AWS and GCP only**, in that order. Hetzner and Linode are out. A third provider is a non-goal.
+- **Whose repo, data and credentials are these?** — and is running them on a personal account permitted? - yes, it is my personal account.
+- **Regions** — latency to the venue/audience vs price. - price is more important for now - low as possible.
+- **Venue fallback plan** — what you do if the internet fails mid-demo (recording, hotspot, local lite version). - recording is the best option for now - try to run locally first.
+- **How demos are defined** — profile + demo in one tfvars file (v1) vs a separate manifest once there are more than ~3 demos. - one tfvars file for now - it is simple and easy to understand.
+- **Where the reaper runs** — recommendation: a scheduled CI workflow with list/delete-only tokens; laptop cron as a fallback. - scheduled CI workflow is the best option for now - it is simple and easy to understand.
+- **Personal vs separate sandbox accounts/projects** — recommendation: separate, with budget alerts, before the first `up`. - separate is the best option for now - it is simple and easy to understand.
 
 
 ## 13. Unverified assumptions (check before relying on them)
 
-- Linode cloud-init / metadata support per image and region.
-- Hetzner server-types endpoint token requirement; Linode types endpoint being unauthenticated.
-- AWS pricing API regional endpoints; GCP Compute Engine SKU structure.
-- DevPod's current maintenance status and Hetzner/Linode provider support.
-- GPU availability per region (Linode, GCP) and AWS GPU quota lead time.
+- AWS pricing API regional endpoints; GCP Compute Engine SKU structure and billing granularity.
+- DevPod's current maintenance status, and whether it covers this demo shape on AWS and GCP.
+- GPU availability per region on GCP, and AWS GPU quota lead time.
 - External-IP billing details on GCP.
 - Tailscale's current free-tier limits and Cloudflare Tunnel's terms.
 - Exact `terraform init -backend-config` usage for per-profile local state paths (check current docs).
