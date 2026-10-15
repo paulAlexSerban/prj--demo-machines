@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SSH_DIR=".ssh"
+SSH_DIR="${ROOT}/.ssh"
 SSH_KEY_PATH="${SSH_DIR}/id_ed25519_demo-machines"
 
 if [[ ! -d "$SSH_DIR" ]]; then

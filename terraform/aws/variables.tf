@@ -86,7 +86,7 @@ variable "allowed_cidrs" {
 }
 
 variable "ssh_public_key_path" {
-  description = "Absolute path to the SSH public key installed on the VM. The private key stays on the laptop."
+  description = "Public key installed on the VM. In a profile, a relative path is from the repo root (.ssh/id_ed25519.pub) or from the profile file (../.ssh/id_ed25519.pub). make turns it into an absolute path because Terraform looks next to terraform/aws."
   type        = string
 
   validation {

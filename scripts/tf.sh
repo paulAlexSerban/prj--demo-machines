@@ -64,7 +64,49 @@ if [[ "$saved_ttl" != "$ttl" || -z "$saved_at" ]]; then
   chmod 600 "$EXPIRES_FILE"
 fi
 
+# Terraform runs with -chdir=terraform/<provider>, so a path in the profile
+# such as .ssh/key.pub or ../.ssh/key.pub is not next to that directory.
+# Resolve it from the repo root, then from the profile file, and pass the
+# absolute path. -var overrides the value in the tfvars file.
+resolve_key_path() {
+  local raw="$1"
+  if [[ "$raw" == /* ]]; then
+    printf '%s\n' "$raw"
+    return
+  fi
+  if [[ -f "${ROOT}/${raw}" ]]; then
+    realpath "${ROOT}/${raw}"
+    return
+  fi
+  if [[ -f "${ROOT}/profiles/${raw}" ]]; then
+    realpath "${ROOT}/profiles/${raw}"
+    return
+  fi
+  printf '%s\n' "${ROOT}/${raw}"
+}
+
+read_assignment() {
+  local key="$1"
+  awk -F= -v key="$key" '
+    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+      value = $2
+      sub(/^[[:space:]]*/, "", value)
+      sub(/[[:space:]]*$/, "", value)
+      if (value ~ /^"/) {
+        sub(/^"/, "", value)
+        sub(/"$/, "", value)
+      }
+      print value
+      exit
+    }
+  ' "$TFVARS"
+}
+
 extra_vars=(-var "expires_at=${saved_at}")
+key_path="$(read_assignment ssh_public_key_path)"
+if [[ -n "$key_path" ]]; then
+  extra_vars+=(-var "ssh_public_key_path=$(resolve_key_path "$key_path")")
+fi
 if ! grep -qE '^[[:space:]]*allowed_cidrs[[:space:]]*=' "$TFVARS"; then
   ip="$(curl -4 -fsS https://checkip.amazonaws.com | tr -d '[:space:]')"
   if [[ ! "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then

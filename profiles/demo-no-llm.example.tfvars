@@ -9,6 +9,7 @@ size                = "small"
 disk_gb             = 30
 ttl_hours           = 12
 owner               = "your-name"
+# Relative to the repo root. ../.ssh/... from the profiles/ directory also works.
 ssh_public_key_path = ".ssh/id_ed25519_demo-machines.pub"
 repo_url            = ""
 repo_ref            = "main"
