@@ -118,7 +118,8 @@ fi
 
 init=(terraform -chdir="$TF_DIR" init -input=false -reconfigure -backend-config="path=${STATE}")
 echo "+ ${init[*]}" >&2
-"${init[@]}"
+# Init's banner is not JSON. output's stdout must stay the JSON document.
+"${init[@]}" >&2
 if [[ -f "$STATE" ]]; then
   chmod 600 "$STATE"
 fi
