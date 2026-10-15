@@ -1,0 +1,44 @@
+{
+  "recorded_at": "2026-10-15",
+  "note": "Hand-written to the Compute Engine aggregatedList shape. Label expires_at uses hyphens because GCP label values cannot contain colons. Not a live project capture.",
+  "payload": {
+    "items": {
+      "zones/us-central1-a": {
+        "instances": [
+          {
+            "name": "expired-demo",
+            "status": "RUNNING",
+            "zone": "https://www.googleapis.com/compute/v1/projects/fixture/zones/us-central1-a",
+            "labels": {
+              "managed-by": "demo-machines",
+              "expires_at": "2026-10-15t12-00-00z",
+              "owner": "fixture"
+            }
+          }
+        ],
+        "disks": [
+          {
+            "name": "expired-demo",
+            "zone": "https://www.googleapis.com/compute/v1/projects/fixture/zones/us-central1-a",
+            "labels": {
+              "managed-by": "demo-machines",
+              "expires_at": "2026-10-15t12-00-00z"
+            },
+            "users": [
+              "https://www.googleapis.com/compute/v1/projects/fixture/zones/us-central1-a/instances/expired-demo"
+            ]
+          },
+          {
+            "name": "orphan-disk",
+            "zone": "https://www.googleapis.com/compute/v1/projects/fixture/zones/us-central1-a",
+            "labels": {
+              "managed-by": "demo-machines",
+              "expires_at": "2026-10-15t12-00-00z"
+            }
+          }
+        ]
+      },
+      "zones/us-central1-b": {}
+    }
+  }
+}

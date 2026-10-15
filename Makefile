@@ -5,7 +5,7 @@ PROFILE ?= demo-no-llm
 export PROVIDER
 export PROFILE
 
-.PHONY: help setup fmt validate plan up down open status allow-my-ip
+.PHONY: help setup fmt validate plan up down open status allow-my-ip reaper generate-ssh-key
 
 help:
 	@echo "setup          bash scripts/setup.sh"
@@ -17,6 +17,7 @@ help:
 	@echo "open           write SSH config, forward ports, open VS Code"
 	@echo "status         show outputs for the current state"
 	@echo "allow-my-ip    set allowed_cidrs to this machine's /32; does not apply"
+	@echo "reaper         npm run reaper -- --dry-run (does not delete)"
 	@echo "variables: PROVIDER PROFILE (defaults aws / demo-no-llm)"
 
 source_env_file:
@@ -60,6 +61,10 @@ status:
 allow-my-ip:
 	@echo "+ bash scripts/allow-my-ip.sh"
 	@bash scripts/allow-my-ip.sh
+
+reaper:
+	@echo "+ npm run reaper -- --dry-run"
+	@npm run reaper -- --dry-run
 
 generate-ssh-key:
 	@echo "+ bash scripts/generate-ssh-key.sh"

@@ -149,6 +149,8 @@ Same variable contract. Use the **default network** and a firewall rule. No serv
 - **Exit:** a forgotten VM expires on its own on both providers. **This unlocks GPU work.**
 - **Sign-off:** "GO Phase 3".
 
+AWS reaper code is in `src/reaper`. `make reaper` is a dry-run. The GCP adapter is fixture-tested only; a live GCP check waits until phase 1b creates a VM.
+
 ---
 
 

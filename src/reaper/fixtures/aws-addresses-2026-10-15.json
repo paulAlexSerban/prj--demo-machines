@@ -1,0 +1,23 @@
+{
+  "recorded_at": "2026-10-15",
+  "note": "Hand-written to the EC2 DescribeAddresses shape from the API reference. Not a live account capture.",
+  "payload": {
+    "Addresses": [
+      {
+        "AllocationId": "eipalloc-expired",
+        "PublicIp": "203.0.113.10",
+        "Tags": [
+          { "Key": "managed-by", "Value": "demo-machines" },
+          { "Key": "expires_at", "Value": "2026-10-15T12:00:00Z" }
+        ]
+      },
+      {
+        "PublicIp": "203.0.113.11",
+        "Tags": [
+          { "Key": "managed-by", "Value": "demo-machines" },
+          { "Key": "expires_at", "Value": "2026-10-15T12:00:00Z" }
+        ]
+      }
+    ]
+  }
+}

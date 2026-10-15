@@ -1,0 +1,24 @@
+{
+  "recorded_at": "2026-10-15",
+  "note": "Hand-written to the EC2 DescribeVolumes shape from the API reference. Not a live account capture.",
+  "payload": {
+    "Volumes": [
+      {
+        "VolumeId": "vol-free",
+        "State": "available",
+        "Tags": [
+          { "Key": "managed-by", "Value": "demo-machines" },
+          { "Key": "expires_at", "Value": "2026-10-15T12:00:00Z" }
+        ]
+      },
+      {
+        "VolumeId": "vol-busy",
+        "State": "in-use",
+        "Tags": [
+          { "Key": "managed-by", "Value": "demo-machines" },
+          { "Key": "expires_at", "Value": "2026-10-15T12:00:00Z" }
+        ]
+      }
+    ]
+  }
+}

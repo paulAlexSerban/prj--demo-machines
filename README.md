@@ -171,7 +171,8 @@ npm run cost -- --plan pricing/usage-plans/q4.yaml     # writes reports/<date>-c
 ## Cost safety
 
 - Every resource is tagged `managed-by=demo-machines`, `owner`, `expires_at`.
-- A **reaper** running outside the VM deletes expired resources on AWS and GCP. Powering the VM off stops compute billing and leaves the instance, disk and public IP in the account.
+- A **reaper** running outside the VM deletes expired resources on AWS and GCP. Powering the VM off stops compute billing and leaves the instance, disk and public IP in the account. `npm run reaper` and `make reaper` only list what they would delete. Deleting requires `npm run reaper -- --delete`.
+- The hourly GitHub Action (`.github/workflows/reaper.yml`) is a dry-run unless you dispatch it with delete enabled. Put `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in repository secrets. If the laptop is on, the fallback is `17 * * * * cd /path/to/prj--demo-machines && npm run reaper -- --dry-run`.
 - Set budget alerts on every account. Treat them as the second line of defence, not the first.
 - Default TTL is 12 hours. Extending it is an explicit action.
 

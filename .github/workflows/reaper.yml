@@ -1,0 +1,50 @@
+name: reaper
+
+on:
+  schedule:
+    # Hourly, offset from the hour. Always a dry-run.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      delete:
+        description: "Delete expired resources. Scheduled runs ignore this and stay a dry-run."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  reaper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are repository secrets you create.
+      # They should be list/delete-only for EC2. This workflow does not create them.
+      # GCP is not required for the AWS dry-run. When phase 1b exists, add
+      # GOOGLE_CLOUD_PROJECT and a service-account secret, then pass --provider gcp.
+      - name: Reap
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: |
+          set -euo pipefail
+          if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+            echo "AWS secrets are not set. Skipping. Add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.delete }}" = "true" ]; then
+            echo "+ npm run reaper -- --delete --region us-east-1"
+            npm run reaper -- --delete --region us-east-1
+          else
+            echo "+ npm run reaper -- --dry-run --region us-east-1"
+            npm run reaper -- --dry-run --region us-east-1
+          fi

@@ -8,7 +8,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "node --import tsx --test src/ssh-config/render.test.ts",
+    "test": "node --import tsx --test src/ssh-config/render.test.ts src/reaper/select.test.ts src/reaper/delete.test.ts src/reaper/fixtures.test.ts",
+    "reaper": "tsx src/reaper/cli.ts",
     "build": "tsc"
   },
   "devDependencies": {
@@ -17,5 +18,10 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.1152.0",
+    "google-auth-library": "^11.3.0",
+    "zod": "^4.6.7"
   }
 }

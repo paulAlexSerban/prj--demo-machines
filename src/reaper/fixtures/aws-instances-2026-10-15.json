@@ -1,0 +1,41 @@
+{
+  "recorded_at": "2026-10-15",
+  "note": "Hand-written to the EC2 DescribeInstances shape from the API reference. Not a live account capture.",
+  "payload": {
+    "Reservations": [
+      {
+        "Instances": [
+          {
+            "InstanceId": "i-expired",
+            "State": { "Name": "running" },
+            "Tags": [
+              { "Key": "managed-by", "Value": "demo-machines" },
+              { "Key": "expires_at", "Value": "2026-10-15T12:00:00Z" },
+              { "Key": "owner", "Value": "fixture" }
+            ]
+          },
+          {
+            "InstanceId": "i-future",
+            "State": { "Name": "running" },
+            "Tags": [
+              { "Key": "managed-by", "Value": "demo-machines" },
+              { "Key": "expires_at", "Value": "2026-10-16T00:00:00Z" }
+            ]
+          },
+          {
+            "InstanceId": "i-foreign",
+            "State": { "Name": "running" },
+            "Tags": [
+              { "Key": "managed-by", "Value": "other" },
+              { "Key": "expires_at", "Value": "2026-10-15T12:00:00Z" }
+            ]
+          },
+          {
+            "InstanceId": "i-bare",
+            "State": { "Name": "running" }
+          }
+        ]
+      }
+    ]
+  }
+}
