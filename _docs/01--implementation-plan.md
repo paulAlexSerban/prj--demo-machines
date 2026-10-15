@@ -1,6 +1,6 @@
 # Demo Machines — Gated Implementation Plan
 
-Derived from `[00--project-brief.md](00--project-brief.md)` §10, `[README.md](../README.md)` and `[AGENTS.md](../AGENTS.md)`. Nothing is built yet.
+Derived from `[00--project-brief.md](00--project-brief.md)` §10, `[README.md](../README.md)` and `[AGENTS.md](../AGENTS.md)`. Phase 1a (AWS) is in the repo. Nothing has been applied. GCP is not built.
 
 ## How to read this plan
 
@@ -64,6 +64,8 @@ Providers are AWS and GCP. Brief §12 already records the policy, region, venue,
 
 **Exit:** written step list + measured total time. Hand the notes to the agent.
 **Sign-off:** "GO Phase 1a" with the runbook filled in.
+
+The live session was skipped at the owner's request. Bootstrap comes from Docker's Ubuntu install document, not from filled timings. The default size is `small` (`t3.small`, 30 GB disk). Set `size` to `medium` or `large` in the profile for a bigger machine.
 
 ---
 
