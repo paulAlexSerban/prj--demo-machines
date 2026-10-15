@@ -6,7 +6,7 @@ The point: **build and showcase demos without owning a powerful desktop or lapto
 
 > ## ⚠️ Status: design only
 >
-> Nothing described below exists yet. This README is the **target interface**; it's written first so the tool gets built to a spec instead of drifting. Each section is marked with the phase that delivers it (see [`_docs/00--project-brief.md`](_docs/00--project-brief.md)). Don't trust a command until its phase is done.
+> Nothing described below exists yet. This README is the **target interface**; it's written first so the tool gets built to a spec instead of drifting. Each section is marked with the phase that delivers it (see `[_docs/00--project-brief.md](_docs/00--project-brief.md)`). Don't trust a command until its phase is done.
 
 
 
@@ -24,15 +24,15 @@ The point: **build and showcase demos without owning a powerful desktop or lapto
 ## What it does
 
 
-| Capability                                                                     | Phase |
-| ------------------------------------------------------------------------------ | ----- |
-| Hand-build the demo environment once (the baseline Terraform must beat)        | 0     |
-| Create/destroy a VM from a *profile* on AWS: Docker installed, repo cloned     | 1a    |
-| Generate SSH config; `open` = port forwards + VS Code on the repo              | 1a    |
-| Same on GCP                                                                    | 1b    |
-| Tag everything with an expiry; a reaper deletes expired machines               | 2     |
-| Cost report for a planned period, per provider                                 | 3     |
-| GPU / local-LLM profile (**only after the reaper works**)                      | 4     |
+| Capability                                                                 | Phase |
+| -------------------------------------------------------------------------- | ----- |
+| Hand-build the demo environment once (the baseline Terraform must beat)    | 0     |
+| Create/destroy a VM from a *profile* on AWS: Docker installed, repo cloned | 1a    |
+| Generate SSH config; `open` = port forwards + VS Code on the repo          | 1a    |
+| Same on GCP                                                                | 1b    |
+| Tag everything with an expiry; a reaper deletes expired machines           | 2     |
+| Cost report for a planned period, per provider                             | 3     |
+| GPU / local-LLM profile (**only after the reaper works**)                  | 4     |
 
 
 
@@ -93,22 +93,23 @@ make down PROVIDER=aws
 Everything variable lives in a profile file. The **same variable names work on every provider**; only the values that map to provider concepts (region, size) differ.
 
 
-| Variable                             | Meaning                                                                           | Default                                                                            |
-| ------------------------------------ | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `name`                               | Resource name prefix                                                              | —                                                                                  |
-| `region`                             | Provider region/zone                                                              | provider default                                                                   |
-| `size`                               | Named size: `small` (`t3.small`), `medium` (`t3.large`), `large` (`t3.2xlarge`, 8 vCPU / 32 GiB). `gpu-24` and `gpu-48` are rejected until the reaper exists | `small`                                                                            |
-| `disk_gb`                            | Root disk. Use `100` with `size = large`                                          | `30`                                                                               |
-| `ttl_hours`                          | Time until the reaper may delete it                                               | `12`                                                                               |
-| `allowed_cidrs`                      | Who may reach SSH                                                                 | required; `make` fills in your current public IP (/32) if unset. Never `0.0.0.0/0` |
-| `ssh_public_key_path`                | Key installed on the VM                                                           | —                                                                                  |
-| `repo_url` / `repo_ref`              | What to clone and which ref                                                       | —                                                                                  |
-| `git_auth`                           | `agent` (SSH agent forwarding). `pat` is rejected so a token never lands in tfvars or user-data | `agent`                                                                            |
-| `startup_command` / `autostart`      | Command run in `~/demo` after clone over SSH (e.g. `make up`); cloud-init never runs it | `""` / `false`                                                                 |
-| `forward_ports`                      | App ports `make open` forwards to `127.0.0.1` (not opened on the security group)  | `[]` (e.g. `[8000, 8001, 8501, 8888, 3000]`)                                     |
-| `tailscale_enabled`                  | **Fallback only:** join a tailnet using an ephemeral tagged key                   | `false`                                                                            |
-| `llm`                                | `{ enabled, runtime, models[] }` for GPU profiles                                 | disabled                                                                           |
-| `tags`                               | Extra tags/labels                                                                 | `{}`                                                                               |
+| Variable                        | Meaning                                                                                                                                                      | Default                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `name`                          | Resource name prefix                                                                                                                                         | —                                                                                  |
+| `region`                        | Provider region/zone                                                                                                                                         | provider default                                                                   |
+| `size`                          | Named size: `small` (`t3.small`), `medium` (`t3.large`), `large` (`t3.2xlarge`, 8 vCPU / 32 GiB). `gpu-24` and `gpu-48` are rejected until the reaper exists | `small`                                                                            |
+| `disk_gb`                       | Root disk. Use `100` with `size = large`                                                                                                                     | `30`                                                                               |
+| `ttl_hours`                     | Time until the reaper may delete it                                                                                                                          | `12`                                                                               |
+| `allowed_cidrs`                 | Who may reach SSH                                                                                                                                            | required; `make` fills in your current public IP (/32) if unset. Never `0.0.0.0/0` |
+| `ssh_public_key_path`           | Key installed on the VM                                                                                                                                      | —                                                                                  |
+| `repo_url` / `repo_ref`         | What to clone and which ref                                                                                                                                  | —                                                                                  |
+| `git_auth`                      | `agent` (SSH agent forwarding). `pat` is rejected so a token never lands in tfvars or user-data                                                              | `agent`                                                                            |
+| `startup_command` / `autostart` | Command run in `~/demo` after clone over SSH (e.g. `make up`); cloud-init never runs it                                                                      | `""` / `false`                                                                     |
+| `forward_ports`                 | App ports `make open` forwards to `127.0.0.1` (not opened on the security group)                                                                             | `[]` (e.g. `[8000, 8001, 8501, 8888, 3000]`)                                       |
+| `env`                           | String map written to `~/demo/.env` over SSH (`make open` / `make bootstrap`). Not user-data, not a Terraform output. Compose and `startup_command` see it.  | `{}`                                                                               |
+| `tailscale_enabled`             | **Fallback only:** join a tailnet using an ephemeral tagged key                                                                                              | `false`                                                                            |
+| `llm`                           | `{ enabled, runtime, models[] }` for GPU profiles                                                                                                            | disabled                                                                           |
+| `tags`                          | Extra tags/labels                                                                                                                                            | `{}`                                                                               |
 
 
 
@@ -125,10 +126,10 @@ Don't jump to 3 or 4 because they're fun: each adds an account, a secret and a f
 ## Lifecycle: what each command really means
 
 
-| Provider | Stopped VM billed?                    | `pause` does                         | Gotchas                                               |
-| -------- | ------------------------------------- | ------------------------------------ | ----------------------------------------------------- |
-| AWS      | Compute no; disk and public IPv4 yes  | Stop instance                        | GPU quota; IP changes on restart                      |
-| GCP      | Compute no; disk and reserved IPs yes | Stop instance                        | Pricing is per-vCPU/RAM SKU, not per instance         |
+| Provider | Stopped VM billed?                    | `pause` does  | Gotchas                                       |
+| -------- | ------------------------------------- | ------------- | --------------------------------------------- |
+| AWS      | Compute no; disk and public IPv4 yes  | Stop instance | GPU quota; IP changes on restart              |
+| GCP      | Compute no; disk and reserved IPs yes | Stop instance | Pricing is per-vCPU/RAM SKU, not per instance |
 
 
 Rule of thumb: **if you won't use it within the same day,** `down` **it.** Re-provisioning is cheaper than paying for an idle box or forgetting it.
@@ -163,7 +164,7 @@ npm run cost -- --plan pricing/usage-plans/q4.yaml     # writes reports/<date>-c
 
 - **No secrets in git.** A secret scanner runs in CI; real `*.tfvars` are gitignored.
 - **Terraform state is secret and local** (`state/`, gitignored, mode 600, encrypted disk, encrypted backup). `sensitive = true` hides terminal output only — it does not keep values out of state.
-- **User-data is not private.** Never put tokens in it.
+- **User-data is not private.** Never put tokens in it. Profile `env` is copied over SSH to `~/demo/.env` (mode 600). It is still on the VM disk until destroy; it is not an output, so it should not enter Terraform state.
 - **Git access:** prefer SSH agent forwarding (nothing stored on the VM). Fallback is a read-only, short-expiry PAT pushed over SSH.
 - **Cloud access from the VM:** use an instance role on AWS, or an attached service account on GCP.
 - **Private networks (only if needed):** Tailscale with ephemeral, tagged, pre-authorized keys and a tight ACL.
@@ -199,9 +200,9 @@ npm run cost -- --plan pricing/usage-plans/q4.yaml     # writes reports/<date>-c
 
 ## Project docs
 
-- [`_docs/00--project-brief.md`](_docs/00--project-brief.md) — goals, non-goals, risks, decisions, phases
-- [`_docs/01--implementation-plan.md`](_docs/01--implementation-plan.md) — gated build order
-- [`AGENTS.md`](AGENTS.md) — rules for AI coding agents working in this repo
+- `[_docs/00--project-brief.md](_docs/00--project-brief.md)` — goals, non-goals, risks, decisions, phases
+- `[_docs/01--implementation-plan.md](_docs/01--implementation-plan.md)` — gated build order
+- `[AGENTS.md](AGENTS.md)` — rules for AI coding agents working in this repo
 
 
 

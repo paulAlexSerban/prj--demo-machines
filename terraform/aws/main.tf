@@ -3,7 +3,7 @@ locals {
   instance_types = {
     small  = "t3.small"   # 2 vCPU / 2 GiB
     medium = "t3.large"   # 2 vCPU / 8 GiB
-    large  = "t3.2xlarge" # 8 vCPU / 32 GiB
+    large  = "c8a.2xlarge" # 8 vCPU / 32 GiB
   }
 
   instance_type = local.instance_types[var.size]

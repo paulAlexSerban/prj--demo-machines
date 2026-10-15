@@ -10,6 +10,7 @@ repo_url="${REPO_URL:-}"
 repo_ref="${REPO_REF:-main}"
 startup_command="${STARTUP_COMMAND:-}"
 autostart="${AUTOSTART:-false}"
+env_file=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -18,6 +19,7 @@ while [[ $# -gt 0 ]]; do
     --ref) repo_ref="${2:?--ref needs a ref}"; shift 2 ;;
     --startup) startup_command="${2:?--startup needs a command}"; shift 2 ;;
     --autostart) autostart=true; shift ;;
+    --env-file) env_file="${2:?--env-file needs a path}"; shift 2 ;;
     *)
       echo "unknown argument: $1" >&2
       exit 1
@@ -70,12 +72,38 @@ EOF
   fi
 }
 
+install_btop() {
+  if command -v btop >/dev/null 2>&1; then
+    echo "btop already installed"
+  else
+    as_root apt-get update
+    as_root apt-get install -y btop
+  fi
+}
+
 ensure_git() {
   if command -v git >/dev/null 2>&1; then
     return 0
   fi
   as_root apt-get update
   as_root apt-get install -y git
+}
+
+install_env() {
+  local dest="$1"
+  if [[ -z "$env_file" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$env_file" ]]; then
+    echo "env file missing: $env_file" >&2
+    exit 1
+  fi
+  mkdir -p "$dest"
+  cp "$env_file" "${dest}/.env"
+  chmod 600 "${dest}/.env"
+  rm -f "$env_file"
+  keys="$(wc -l <"${dest}/.env" | tr -d ' ')"
+  echo "wrote ${keys} keys to ${dest}/.env"
 }
 
 run_startup() {
@@ -88,6 +116,12 @@ run_startup() {
     exit 1
   fi
   cd "$dest"
+  if [[ -f .env ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
+  fi
   # sg docker: docker group without logging out after usermod.
   sg docker -c "$startup_command"
 }
@@ -105,6 +139,7 @@ clone_repo() {
     git -C "$dest" fetch --tags origin
   fi
   git -C "$dest" checkout "$repo_ref"
+  install_env "$dest"
   run_startup "$dest"
 }
 
@@ -118,6 +153,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 install_docker
+install_btop
 if [[ "$docker_only" -eq 1 ]]; then
   exit 0
 fi

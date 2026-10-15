@@ -13,13 +13,17 @@ if [[ ! -f "$STATE" ]]; then
   exit 1
 fi
 
+TFVARS="${ROOT}/profiles/${PROFILE}.tfvars"
 json="${1:-}"
 tmp_json=""
 if [[ -z "$json" ]]; then
+  raw_json="$(mktemp)"
   tmp_json="$(mktemp)"
   json="$tmp_json"
-  trap 'rm -f "$tmp_json"' EXIT
-  bash "${ROOT}/scripts/tf.sh" output >"$json"
+  trap 'rm -f "$raw_json" "$tmp_json"' EXIT
+  bash "${ROOT}/scripts/tf.sh" output >"$raw_json"
+  python3 "${ROOT}/scripts/enrich-output-json.py" "$raw_json" "$TFVARS" >"$json"
+  chmod 600 "$json"
 fi
 
 mapfile -t _boot < <(
@@ -91,5 +95,22 @@ if [[ "$autostart" == "true" ]]; then
   fi
 fi
 
+echo "+ install ${BOOTSTRAP} from repo"
+"${ssh_base[@]}" "sudo tee ${BOOTSTRAP} >/dev/null && sudo chmod 0755 ${BOOTSTRAP}" \
+  <"${ROOT}/bootstrap/bootstrap.sh"
+
+remote_env="/tmp/demo-machines.env"
+env_count="$(python3 -c 'import json,sys; print(len((json.load(sys.stdin).get("env") or {}).get("value") or {}))' <"$json")"
+echo "+ writing ${remote_env} (${env_count} keys); copied to ~/demo/.env after clone"
+python3 "${ROOT}/scripts/enrich-output-json.py" --dotenv "$json" \
+  | "${ssh_base[@]}" "cat > ${remote_env} && chmod 600 ${remote_env}"
+remote_args+=(--env-file "$remote_env")
+
+# ssh joins extra argv into one remote shell string, so `make setup && ...`
+# would become `--startup make` plus a leftover `setup` argument. Quote it.
+quoted=()
+for arg in "$BOOTSTRAP" "${remote_args[@]}"; do
+  quoted+=("$(printf '%q' "$arg")")
+done
 echo "+ ssh -A ${ssh_user}@${public_ip} ${BOOTSTRAP} ..."
-"${ssh_base[@]}" "$BOOTSTRAP" "${remote_args[@]}"
+"${ssh_base[@]}" "${quoted[*]}"

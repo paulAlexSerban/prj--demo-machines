@@ -19,6 +19,11 @@ startup_command = ""
 autostart       = false
 # forward_ports     = [8000, 8001, 8501, 8888, 3000]
 forward_ports     = []
+# Copied to ~/demo/.env over SSH (make open / make bootstrap). Not user-data.
+# Values must be quoted strings. Real tokens belong in the gitignored tfvars copy.
+env = {
+  # DEMO_NAME = "set-me"
+}
 tailscale_enabled = false
 
 llm = {

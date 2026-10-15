@@ -146,6 +146,21 @@ variable "forward_ports" {
   }
 }
 
+variable "env" {
+  description = "Copied to ~/demo/.env over SSH by make open / make bootstrap. Declared so the profile tfvars is valid. Not referenced by resources or outputs, so values should not land in state. Never placed in user-data. The gitignored profile and the VM disk still hold them."
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+
+  validation {
+    condition = alltrue([
+      for k, v in var.env :
+      can(regex("^[A-Za-z_][A-Za-z0-9_]*$", k)) && !strcontains(v, "\n")
+    ])
+    error_message = "env keys must look like ENV names and values must be single-line strings."
+  }
+}
+
 variable "tailscale_enabled" {
   description = "Reserved. Tailscale is not wired into this phase."
   type        = bool

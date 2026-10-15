@@ -29,6 +29,7 @@ json="$(mktemp)"
 trap 'rm -f "$raw_json" "$json"' EXIT
 bash "${ROOT}/scripts/tf.sh" output >"$raw_json"
 python3 "${ROOT}/scripts/enrich-output-json.py" "$raw_json" "$TFVARS" >"$json"
+chmod 600 "$json"
 
 echo "+ bash scripts/bootstrap-remote.sh"
 bash "${ROOT}/scripts/bootstrap-remote.sh" "$json"
@@ -49,23 +50,35 @@ ports="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print(" ".join(
 if [[ -z "${ports// }" ]]; then
   echo "forward_ports is empty in state and ${TFVARS}. Set forward_ports = [3000, ...] and run make open again." >&2
 else
-  for port in $ports; do
-    # Drop a stale tunnel from an earlier make open so the port can bind again.
-    pkill -f "ssh.*-L ${port}:127.0.0.1:${port}.*${ALIAS}" 2>/dev/null || true
-    pkill -f "ssh.*-L ${port}:127.0.0.1:${port}.*@${ALIAS}" 2>/dev/null || true
-    echo "+ ssh -f -N -L ${port}:127.0.0.1:${port} ${ALIAS}"
-    if ! ssh -f -N -o ExitOnForwardFailure=yes -L "${port}:127.0.0.1:${port}" "$ALIAS"; then
-      echo "failed to forward local port ${port} (is something else already using it?)" >&2
-      exit 1
+  # One ssh -f -N applies every LocalForward in the generated host block.
+  # A second session (or extra -L flags) will fail with "Address already in use".
+  pkill -f "ssh -f -N .*[[:space:]]${ALIAS}$" 2>/dev/null || true
+  for _ in 1 2 3 4 5; do
+    still_bound=0
+    for port in $ports; do
+      if command -v ss >/dev/null 2>&1 && ss -tln | grep -qE ":${port} "; then
+        still_bound=1
+        break
+      fi
+    done
+    if [[ "$still_bound" -eq 0 ]]; then
+      break
     fi
+    sleep 0.2
   done
+  echo "+ ssh -f -N ${ALIAS}"
+  if ! ssh -f -N -o ExitOnForwardFailure=yes "$ALIAS"; then
+    echo "failed to start LocalForward for ${ALIAS} (is a local port already in use?)" >&2
+    exit 1
+  fi
   for port in $ports; do
     if command -v ss >/dev/null 2>&1; then
       if ! ss -tln | grep -qE ":${port} "; then
-        echo "warning: local port ${port} is not listening after ssh -L" >&2
+        echo "warning: local port ${port} is not listening after ssh -N" >&2
       fi
     fi
-    if ssh -o ConnectTimeout=5 "$ALIAS" "timeout 2 bash -c 'echo >/dev/tcp/127.0.0.1/${port}'" 2>/dev/null; then
+    # ClearAllForwardings: this check must not try to re-bind LocalForward.
+    if ssh -o ClearAllForwardings=yes -o ConnectTimeout=5 "$ALIAS" "timeout 2 bash -c 'echo >/dev/tcp/127.0.0.1/${port}'" 2>/dev/null; then
       echo "remote ${port}: accepting connections on the VM"
     else
       echo "remote ${port}: nothing listening on the VM yet (SSH in and start the app, or set autostart = true and startup_command in ${TFVARS})" >&2
