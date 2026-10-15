@@ -14,10 +14,12 @@ ssh_public_key_path = ".ssh/id_ed25519_demo-machines.pub"
 repo_url            = ""
 repo_ref            = "main"
 git_auth            = "agent"
-compose_file        = ""
-compose_autostart   = false
-forward_ports       = []
-tailscale_enabled   = false
+# startup_command = "make up"
+startup_command = ""
+autostart       = false
+# forward_ports     = [8000, 8001, 8501, 8888, 3000]
+forward_ports     = []
+tailscale_enabled = false
 
 llm = {
   enabled = false

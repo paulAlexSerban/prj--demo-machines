@@ -118,16 +118,21 @@ variable "git_auth" {
   }
 }
 
-variable "compose_file" {
-  description = "Compose file path relative to the cloned repo. Used only when bootstrap.sh is run over SSH."
+variable "startup_command" {
+  description = "Shell command run in ~/demo after clone when autostart is true (e.g. make up). Not run by cloud-init. Do not put secrets here; state stores it."
   type        = string
   default     = ""
 }
 
-variable "compose_autostart" {
-  description = "When true, bootstrap.sh over SSH runs docker compose up -d. Cloud-init does not start the stack."
+variable "autostart" {
+  description = "When true, bootstrap.sh over SSH runs startup_command in the cloned repo. Cloud-init does not start the app."
   type        = bool
   default     = false
+
+  validation {
+    condition     = var.autostart == false || length(trimspace(var.startup_command)) > 0
+    error_message = "autostart requires a non-empty startup_command."
+  }
 }
 
 variable "forward_ports" {

@@ -73,8 +73,11 @@ make plan PROVIDER=aws PROFILE=demo-no-llm
 # 3. Create it
 make up PROVIDER=aws PROFILE=demo-no-llm
 
-# 4. Connect: writes ~/.ssh/config.d/demo-machines, starts port forwards, opens VS Code on the repo
+# 4. Connect: clone + optional autostart, SSH config, port forwards, VS Code on ~/demo
 make open PROVIDER=aws
+
+# Re-run clone/start without reopening VS Code
+make bootstrap PROVIDER=aws
 
 # 5. Check what's running, TTL left, cost so far
 make status
@@ -83,7 +86,7 @@ make status
 make down PROVIDER=aws
 ```
 
-**Reaching frontend ports:** VS Code Remote-SSH forwards ports automatically; or `ssh -L 3000:localhost:3000 demo-aws`. Nothing is opened to the internet by default.
+**Reaching frontend ports:** Set `forward_ports` in your profile (e.g. `8000`, `8001`, `8501`, `8888`, `3000`). `make open` writes SSH `LocalForward` entries and starts tunnels to `127.0.0.1` on your laptop — open `http://127.0.0.1:8000` in a browser. VS Code Remote-SSH can forward ports too. Nothing is opened to the internet by default.
 
 ## Configuration
 
@@ -101,8 +104,8 @@ Everything variable lives in a profile file. The **same variable names work on e
 | `ssh_public_key_path`                | Key installed on the VM                                                           | —                                                                                  |
 | `repo_url` / `repo_ref`              | What to clone and which ref                                                       | —                                                                                  |
 | `git_auth`                           | `agent` (SSH agent forwarding). `pat` is rejected so a token never lands in tfvars or user-data | `agent`                                                                            |
-| `compose_file` / `compose_autostart` | Compose entry point; start it at boot                                             | — / `false`                                                                        |
-| `forward_ports`                      | Ports you intend to forward                                                       | `[]`                                                                               |
+| `startup_command` / `autostart`      | Command run in `~/demo` after clone over SSH (e.g. `make up`); cloud-init never runs it | `""` / `false`                                                                 |
+| `forward_ports`                      | App ports `make open` forwards to `127.0.0.1` (not opened on the security group)  | `[]` (e.g. `[8000, 8001, 8501, 8888, 3000]`)                                     |
 | `tailscale_enabled`                  | **Fallback only:** join a tailnet using an ephemeral tagged key                   | `false`                                                                            |
 | `llm`                                | `{ enabled, runtime, models[] }` for GPU profiles                                 | disabled                                                                           |
 | `tags`                               | Extra tags/labels                                                                 | `{}`                                                                               |
@@ -112,7 +115,7 @@ Everything variable lives in a profile file. The **same variable names work on e
 
 ## Reaching your demo (easiest first)
 
-1. **SSH + port forwarding (default).** `make open` forwards your demo's ports to `localhost`. SSH accepts only your IP (`allowed_cidrs`). Nothing is public.
+1. **SSH + port forwarding (default).** List app ports in `forward_ports` (for example `[8000, 8001, 8501, 8888, 3000]`). `make open` clones the repo, runs `startup_command` when `autostart` is true, then forwards each port to `http://127.0.0.1:<port>` on your laptop. SSH accepts only your IP (`allowed_cidrs`). App ports are never opened on the security group.
 2. **Refresh your allowed IP** when it changes (new venue, new Wi-Fi): `make allow-my-ip` updates the firewall rule — a one-variable `terraform apply`.
 3. **Tailscale — only if you need it:** reaching private/internal resources from the VM, giving another device private access (tablet, second screen), or an IP that changes too often for step 2. Uses an ephemeral, tagged key. Off by default.
 4. **A public URL (e.g. Cloudflare Tunnel)** — only if the audience must open the demo themselves. Put access control in front and keep it short-lived.

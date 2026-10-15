@@ -42,12 +42,12 @@ output "repo_ref" {
   value = var.repo_ref
 }
 
-output "compose_file" {
-  value = var.compose_file
+output "startup_command" {
+  value = var.startup_command
 }
 
-output "compose_autostart" {
-  value = var.compose_autostart
+output "autostart" {
+  value = var.autostart
 }
 
 output "ttl_hours" {

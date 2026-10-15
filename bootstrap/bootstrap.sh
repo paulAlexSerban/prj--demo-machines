@@ -8,16 +8,16 @@ set -euo pipefail
 docker_only=0
 repo_url="${REPO_URL:-}"
 repo_ref="${REPO_REF:-main}"
-compose_file="${COMPOSE_FILE:-}"
-compose_up="${COMPOSE_AUTOSTART:-false}"
+startup_command="${STARTUP_COMMAND:-}"
+autostart="${AUTOSTART:-false}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --docker-only) docker_only=1; shift ;;
     --repo) repo_url="${2:?--repo needs a url}"; shift 2 ;;
     --ref) repo_ref="${2:?--ref needs a ref}"; shift 2 ;;
-    --compose) compose_file="${2:?--compose needs a path}"; shift 2 ;;
-    --up) compose_up=true; shift ;;
+    --startup) startup_command="${2:?--startup needs a command}"; shift 2 ;;
+    --autostart) autostart=true; shift ;;
     *)
       echo "unknown argument: $1" >&2
       exit 1
@@ -39,7 +39,7 @@ install_docker() {
   else
     export DEBIAN_FRONTEND=noninteractive
     as_root apt-get update
-    as_root apt-get install -y ca-certificates curl
+    as_root apt-get install -y ca-certificates curl make
     as_root install -m 0755 -d /etc/apt/keyrings
     as_root curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
     as_root chmod a+r /etc/apt/keyrings/docker.asc
@@ -59,6 +59,11 @@ EOF
     as_root apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   fi
 
+  if ! command -v make >/dev/null 2>&1; then
+    as_root apt-get update
+    as_root apt-get install -y make
+  fi
+
   as_root systemctl enable --now docker
   if id ubuntu >/dev/null 2>&1; then
     as_root usermod -aG docker ubuntu
@@ -71,6 +76,20 @@ ensure_git() {
   fi
   as_root apt-get update
   as_root apt-get install -y git
+}
+
+run_startup() {
+  local dest="$1"
+  if [[ "$autostart" != "true" ]]; then
+    return 0
+  fi
+  if [[ -z "${startup_command// }" ]]; then
+    echo "autostart is set but startup_command is empty" >&2
+    exit 1
+  fi
+  cd "$dest"
+  # sg docker: docker group without logging out after usermod.
+  sg docker -c "$startup_command"
 }
 
 clone_repo() {
@@ -86,10 +105,7 @@ clone_repo() {
     git -C "$dest" fetch --tags origin
   fi
   git -C "$dest" checkout "$repo_ref"
-  if [[ "$compose_up" == "true" && -n "$compose_file" ]]; then
-    # sudo so the first run works before the docker group is on this login.
-    sudo docker compose -f "${dest}/${compose_file}" up -d
-  fi
+  run_startup "$dest"
 }
 
 if [[ "$(id -u)" -ne 0 ]]; then

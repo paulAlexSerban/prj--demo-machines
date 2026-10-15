@@ -101,7 +101,7 @@ AWS is the first provider, so this phase carries the Terraform learning and take
 
 ### 1a.3 cloud-init via `templatefile`
 
-- Agent: `bootstrap/cloud-init.yaml.tftpl` (calls or embeds `bootstrap.sh`; no secrets), wiring to `user_data`. Idempotent `bootstrap.sh` (Docker + Compose, clone repo using agent forwarding, optional `compose up`).
+- Agent: `bootstrap/cloud-init.yaml.tftpl` (calls or embeds `bootstrap.sh`; no secrets), wiring to `user_data`. Idempotent `bootstrap.sh` (Docker + Compose, clone repo using agent forwarding, optional `startup_command` when `autostart` is set).
 - **DRY gate:** `validate`; render the template locally (`terraform console` or a test output) and check **no secret** appears; run `shellcheck bootstrap/bootstrap.sh` if installed.
 - **LIVE 💰:** `make up`; time to ready; run `bootstrap.sh` a **second time** over SSH to prove idempotency; `docker ps`; `make down`.
 

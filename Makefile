@@ -5,7 +5,7 @@ PROFILE ?= demo-no-llm
 export PROVIDER
 export PROFILE
 
-.PHONY: help setup fmt validate plan up down open status allow-my-ip reaper generate-ssh-key
+.PHONY: help setup fmt validate plan up down open bootstrap status allow-my-ip reaper generate-ssh-key
 
 help:
 	@echo "setup          bash scripts/setup.sh"
@@ -14,7 +14,8 @@ help:
 	@echo "plan           terraform plan (PROVIDER=$(PROVIDER) PROFILE=$(PROFILE))"
 	@echo "up             terraform apply — you run this; it spends money"
 	@echo "down           terraform destroy"
-	@echo "open           write SSH config, forward ports, open VS Code"
+	@echo "open           clone/start demo on VM, SSH config, forwards, VS Code"
+	@echo "bootstrap      clone repo and run startup_command on the VM over SSH"
 	@echo "status         show outputs for the current state"
 	@echo "allow-my-ip    set allowed_cidrs to this machine's /32; does not apply"
 	@echo "reaper         npm run reaper -- --dry-run (does not delete)"
@@ -53,6 +54,10 @@ down:
 open:
 	@echo "+ bash scripts/open.sh"
 	@bash scripts/open.sh
+
+bootstrap:
+	@echo "+ bash scripts/bootstrap-remote.sh"
+	@bash scripts/bootstrap-remote.sh
 
 status:
 	@echo "+ bash scripts/status.sh"

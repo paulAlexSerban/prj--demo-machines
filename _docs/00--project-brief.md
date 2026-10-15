@@ -134,7 +134,7 @@ Kubernetes · Ansible (v1) · multi-user/team features · remote state backends 
 
 ### Demos vs machines
 
-A **profile** describes a machine (provider, size, disk, TTL). A **demo** is what runs on it (repo, ref, compose file, ports to forward, a health-check URL). In v1 both live in one tfvars file per demo. If you end up with more than ~3 demos, split them into a small manifest per demo so one machine profile can serve many demos.
+A **profile** describes a machine (provider, size, disk, TTL). A **demo** is what runs on it (repo, ref, startup command such as `make up`, ports to forward, a health-check URL). In v1 both live in one tfvars file per demo. If you end up with more than ~3 demos, split them into a small manifest per demo so one machine profile can serve many demos.
 
 ### Reference prices (rough planning snapshot, Oct 2026)
 
@@ -168,7 +168,7 @@ Confirm the curated `gpu-24` / `gpu-48` map against current regional availabilit
 | F2  | MUST     | Destroy it and confirm no tagged resources remain.                                                              |
 | F3  | MUST     | Every resource is tagged with `managed-by`, `owner`, `expires_at`; a reaper deletes expired resources (§9).     |
 | F4  | MUST     | Generate an SSH config entry usable by VS Code Remote-SSH (including agent forwarding when configured).         |
-| F5  | MUST     | Bootstrap: Docker + Compose (+ NVIDIA toolkit for GPU), clone the repo (given ref), optionally `compose up`.    |
+| F5  | MUST     | Bootstrap: Docker + Compose (+ NVIDIA toolkit for GPU), clone the repo (given ref), optionally run a configured startup command (e.g. `make up`) over SSH.    |
 | F6  | MUST     | Inbound access restricted to explicit CIDRs or a private network. No app ports open to the internet by default. |
 | F7  | SHOULD   | `pause` / `resume` with *explicit* cost semantics per provider (§6).                                            |
 | F8  | SHOULD   | `status`: what is running, since when, TTL remaining, cost so far.                                              |
