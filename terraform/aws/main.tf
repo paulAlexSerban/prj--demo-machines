@@ -8,9 +8,12 @@ locals {
 
   instance_type = local.instance_types[var.size]
 
-  # Any default subnet. This demo does not pin an availability zone.
-  # An empty list means the region has no default subnet: stop, do not build a VPC.
-  subnet_id = data.aws_subnets.default.ids[0]
+  supported_subnet_ids = sort([
+    for id, subnet in data.aws_subnet.default :
+    id if contains(data.aws_ec2_instance_type_offerings.this.locations, subnet.availability_zone)
+  ])
+
+  subnet_id = length(local.supported_subnet_ids) > 0 ? local.supported_subnet_ids[0] : ""
 
   user_data = templatefile("${path.module}/../../bootstrap/cloud-init.yaml.tftpl", {
     bootstrap_b64 = base64encode(file("${path.module}/../../bootstrap/bootstrap.sh"))
@@ -84,6 +87,13 @@ resource "aws_instance" "this" {
   key_name                    = aws_key_pair.this.key_name
   associate_public_ip_address = true
   user_data                   = local.user_data
+
+  lifecycle {
+    precondition {
+      condition     = length(local.supported_subnet_ids) > 0
+      error_message = "No default subnet in ${var.region} offers ${local.instance_type}. Stop here; do not build a VPC for this."
+    }
+  }
 
   # The security group and key pair are dependencies via their ids. No extra depends_on.
 

@@ -3,12 +3,12 @@
 # gpu-24 and gpu-48 are rejected until the reaper exists.
 # For size = "large", set disk_gb = 100.
 
-name                = "demo-no-llm"
-region              = "us-east-1"
-size                = "small"
-disk_gb             = 30
-ttl_hours           = 12
-owner               = "your-name"
+name      = "demo-no-llm"
+region    = "us-east-1"
+size      = "small"
+disk_gb   = 30
+ttl_hours = 12
+owner     = "your-name"
 # Relative to the repo root. ../.ssh/... from the profiles/ directory also works.
 ssh_public_key_path = ".ssh/id_ed25519_demo-machines.pub"
 repo_url            = ""

@@ -44,3 +44,19 @@ data "aws_subnets" "default" {
     values = ["true"]
   }
 }
+
+data "aws_subnet" "default" {
+  for_each = toset(data.aws_subnets.default.ids)
+  id       = each.value
+}
+
+# Some default subnets sit in zones that do not offer every instance type.
+# us-east-1e, for example, does not offer t3.small.
+data "aws_ec2_instance_type_offerings" "this" {
+  filter {
+    name   = "instance-type"
+    values = [local.instance_type]
+  }
+
+  location_type = "availability-zone"
+}
