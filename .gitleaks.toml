@@ -1,0 +1,4 @@
+title = "demo-machines"
+
+[extend]
+useDefault = true

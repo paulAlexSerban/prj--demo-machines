@@ -14,6 +14,7 @@ crash.*.log
 # control as they are data points which are potentially sensitive and subject
 # to change depending on the environment.
 *.tfvars
+!*.example.tfvars
 *.tfvars.json
 
 # Ignore override files as they are usually used to override resources locally and so
@@ -45,7 +46,10 @@ terraform.rc
 
 ## Node.js
 node_modules/
-package-lock.json
+dist/
+
+## Local Terraform state (one file per provider and profile). Secret.
+state/
 
 ## Python
 __pycache__/
@@ -72,3 +76,4 @@ __pycache__/
 
 ## Environment variables
 .env
+.ssh
