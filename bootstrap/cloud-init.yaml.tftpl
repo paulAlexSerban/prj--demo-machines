@@ -1,0 +1,11 @@
+#cloud-config
+# Installs Docker only. The clone happens later over SSH so the laptop's agent
+# can authenticate, and so no token is placed in user-data.
+write_files:
+  - path: /usr/local/sbin/demo-machines-bootstrap
+    owner: root:root
+    permissions: "0755"
+    encoding: b64
+    content: ${bootstrap_b64}
+runcmd:
+  - [/usr/local/sbin/demo-machines-bootstrap, --docker-only]

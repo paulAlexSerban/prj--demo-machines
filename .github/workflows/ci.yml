@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned tools
+        run: bash scripts/setup.sh
+      - name: Format
+        run: terraform fmt -check -recursive
+      - name: Init and validate
+        run: |
+          terraform -chdir=terraform/aws init -backend=false -input=false
+          terraform -chdir=terraform/aws validate
+      - name: tflint
+        run: |
+          tflint --init
+          tflint --recursive
+      - name: trivy
+        run: trivy config --exit-code 1 --skip-dirs node_modules --skip-dirs dist --skip-dirs .terraform .
+      - name: gitleaks
+        run: gitleaks detect --no-banner
+
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

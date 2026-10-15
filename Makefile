@@ -19,6 +19,10 @@ help:
 	@echo "allow-my-ip    set allowed_cidrs to this machine's /32; does not apply"
 	@echo "variables: PROVIDER PROFILE (defaults aws / demo-no-llm)"
 
+source_env_file:
+	@echo "run manually: 'set -a && source .env && set +a'"
+	@echo "NOTICE: this will be per terminal session"
+
 setup:
 	@echo "+ bash scripts/setup.sh"
 	@bash scripts/setup.sh
